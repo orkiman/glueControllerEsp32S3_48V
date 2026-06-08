@@ -12,7 +12,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtWidgets import (QFileDialog, QFormLayout, QGridLayout,
+from PySide6.QtWidgets import (QCheckBox, QFileDialog, QFormLayout, QGridLayout,
                                QGroupBox, QHBoxLayout, QPlainTextEdit,
                                QPushButton, QVBoxLayout, QWidget)
 
@@ -75,11 +75,14 @@ class ConfigureScreen(QWidget):
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(2000)
 
+        self.chk_verbose = QCheckBox("הצג סטטוס שוטף")
+        self.chk_verbose.setChecked(False)
         btn_clear  = QPushButton("נקה")
         btn_clear.clicked.connect(self._clear_log)
         btn_export = QPushButton("ייצוא CSV…")
         btn_export.clicked.connect(self._export_csv)
         log_actions = QHBoxLayout()
+        log_actions.addWidget(self.chk_verbose)
         log_actions.addStretch(1)
         log_actions.addWidget(btn_clear)
         log_actions.addWidget(btn_export)
@@ -101,6 +104,7 @@ class ConfigureScreen(QWidget):
 
         state.config_changed.connect(self._on_config)
         state.log_appended.connect(self._on_log)
+        state.command_sent.connect(self._on_command_sent)
         self._on_config(state.config)
 
     # ---- handlers ----------------------------------------------------------
@@ -112,10 +116,29 @@ class ConfigureScreen(QWidget):
         self.f_debounce.setValue(c.debounce_ms)
         self.f_ppm     .setValue(c.pulses_per_mm)
 
+    def _is_routine(self, ev: dict) -> bool:
+        """High-frequency, low-signal traffic that clutters the log:
+        periodic status frames and the 1 Hz ping/ack keep-alive."""
+        kind = ev.get("event", "")
+        if kind == "status":
+            return True
+        if kind == "ack" and ev.get("cmd") == "ping":
+            return True
+        return False
+
     def _on_log(self, ev: dict) -> None:
+        if self._is_routine(ev) and not self.chk_verbose.isChecked():
+            return
         ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         self._log_rows.append((ts, ev))
         self.log.appendPlainText(f"[{ts}] {json.dumps(ev, ensure_ascii=False)}")
+
+    def _on_command_sent(self, cmd: dict) -> None:
+        ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        row = {"dir": "out", **cmd}
+        self._log_rows.append((ts, row))
+        self.log.appendPlainText(
+            f"[{ts}] >> {json.dumps(cmd, ensure_ascii=False)}")
 
     def _clear_log(self) -> None:
         self._log_rows.clear()

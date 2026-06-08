@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (QBrush, QColor, QCursor, QFont, QPainter, QPen,
                            QWheelEvent)
 from PySide6.QtWidgets import (QGraphicsItem, QGraphicsScene, QGraphicsView,
@@ -114,6 +114,7 @@ class SegmentItem(QGraphicsItem):
                  ptype_getter: Callable[[], proto.PatternType],
                  on_committed: Callable[[], None],
                  on_request_delete: Callable[["SegmentItem"], None],
+                 siblings_getter: Callable[[], list["SegmentItem"]],
                  color: QColor) -> None:
         super().__init__()
         self._lane_y      = lane_y
@@ -121,10 +122,13 @@ class SegmentItem(QGraphicsItem):
         self._ptype_get   = ptype_getter
         self._on_commit   = on_committed
         self._on_delete   = on_request_delete
+        self._siblings    = siblings_getter
         self._color       = color
         self._drag_anchor: float | None = None  # scene X at press for body drag
         self._drag_start_mm: float = 0.0
         self._drag_end_mm:   float = 0.0
+        self._drag_left_lim:  float = 0.0
+        self._drag_right_lim: float = MAX_CANVAS_MM
 
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setAcceptHoverEvents(True)
@@ -212,9 +216,32 @@ class SegmentItem(QGraphicsItem):
                 x_mm += self.elem.spacing_mm
                 i += 1
 
+    # ---- overlap limits (siblings in the same lane) ------------------------
+    def _left_limit(self) -> float:
+        """Lowest start_mm allowed for this segment: the right edge of the
+        nearest sibling sitting to our left (0 if none)."""
+        lim = 0.0
+        for s in self._siblings():
+            if s is self:
+                continue
+            if s.elem.end_mm <= self.elem.start_mm + 1e-6:
+                lim = max(lim, s.elem.end_mm)
+        return lim
+
+    def _right_limit(self) -> float:
+        """Highest end_mm allowed for this segment: the left edge of the
+        nearest sibling sitting to our right (MAX_CANVAS_MM if none)."""
+        lim = MAX_CANVAS_MM
+        for s in self._siblings():
+            if s is self:
+                continue
+            if s.elem.start_mm >= self.elem.end_mm - 1e-6:
+                lim = min(lim, s.elem.start_mm)
+        return lim
+
     # ---- mutation ----------------------------------------------------------
     def set_start(self, mm: float, commit: bool) -> None:
-        mm = max(0.0, min(mm, self.elem.end_mm - SNAP_MM))
+        mm = max(self._left_limit(), min(mm, self.elem.end_mm - SNAP_MM))
         self.prepareGeometryChange()
         self.elem.start_mm = mm
         self._sync_handles()
@@ -223,7 +250,8 @@ class SegmentItem(QGraphicsItem):
             self._on_commit()
 
     def set_end(self, mm: float, commit: bool) -> None:
-        mm = max(self.elem.start_mm + SNAP_MM, min(mm, MAX_CANVAS_MM))
+        mm = max(self.elem.start_mm + SNAP_MM,
+                 min(mm, self._right_limit()))
         self.prepareGeometryChange()
         self.elem.end_mm = mm
         self._sync_handles()
@@ -240,6 +268,9 @@ class SegmentItem(QGraphicsItem):
             self._drag_anchor   = ev.scenePos().x()
             self._drag_start_mm = self.elem.start_mm
             self._drag_end_mm   = self.elem.end_mm
+            # Freeze the gap we are allowed to move within (neighbour edges).
+            self._drag_left_lim  = self._left_limit()
+            self._drag_right_lim = self._right_limit()
             ev.accept()
         else:
             super().mousePressEvent(ev)
@@ -250,7 +281,8 @@ class SegmentItem(QGraphicsItem):
         d_mm = px_to_mm(ev.scenePos().x() - self._drag_anchor)
         length = self._drag_end_mm - self._drag_start_mm
         new_start = snap(self._drag_start_mm + d_mm)
-        new_start = max(0.0, min(new_start, MAX_CANVAS_MM - length))
+        hi = min(MAX_CANVAS_MM, self._drag_right_lim) - length
+        new_start = max(self._drag_left_lim, min(new_start, hi))
         self.prepareGeometryChange()
         self.elem.start_mm = new_start
         self.elem.end_mm   = new_start + length
@@ -340,8 +372,13 @@ class PatternEditorView(QGraphicsView):
                 (s.elem.end_mm for s in self._segments[gun_idx]),
                 default=0.0)
             start_mm = existing_end + 20.0 if existing_end > 0 else 50.0
-        start = snap(max(0.0, min(start_mm,
-                                  MAX_CANVAS_MM - DEFAULT_NEW_LEN_MM)))
+        # Never create a segment that overlaps an existing one: slide the
+        # requested start right to the first free gap that fits.
+        free_start = self._find_free_start(
+            gun_idx, max(0.0, start_mm), DEFAULT_NEW_LEN_MM)
+        if free_start is None:
+            return  # no room before MAX_CANVAS_MM
+        start = snap(free_start)
         spacing = DEFAULT_SPACING_MM if (
             self._gun_types[gun_idx] == proto.PatternType.DOTS) else 0.0
         elem = proto.PatternElement(start_mm=start,
@@ -349,6 +386,25 @@ class PatternEditorView(QGraphicsView):
                                     spacing_mm=spacing)
         self._add_segment_item(gun_idx, elem)
         self.pattern_committed.emit(gun_idx)
+
+    def _find_free_start(self, gun_idx: int, start: float,
+                         length: float) -> float | None:
+        """Return the first start >= `start` where a `length`-mm segment fits
+        without overlapping existing segments, or None if it cannot fit
+        before MAX_CANVAS_MM."""
+        occupied = sorted((s.elem.start_mm, s.elem.end_mm)
+                          for s in self._segments[gun_idx])
+        cand = start
+        moved = True
+        while moved:
+            moved = False
+            for a, b in occupied:
+                if cand < b and cand + length > a:   # overlaps [a, b]
+                    cand = b                         # jump past it
+                    moved = True
+            if cand + length > MAX_CANVAS_MM:
+                return None
+        return cand
 
     def clear_gun(self, gun_idx: int, emit: bool = True) -> None:
         for s in self._segments[gun_idx]:
@@ -375,24 +431,30 @@ class PatternEditorView(QGraphicsView):
     def _lane_y(self, gun_idx: int) -> float:
         return gun_idx * LANE_H + 24  # 24px reserved for top ruler
 
+    def _clamp_canvas(self, max_end: float) -> float:
+        """Smallest canvas wide enough to show `max_end` plus margin, clamped
+        to [MIN_CANVAS_MM, MAX_CANVAS_MM] and rounded up to the nearest
+        50 mm so the ruler ticks line up neatly."""
+        target = max(MIN_CANVAS_MM, max_end + CANVAS_MARGIN_MM)
+        target = min(MAX_CANVAS_MM, target)
+        return float(int((target + 49.999) / 50.0) * 50)
+
     def _canvas_length_mm(self) -> float:
-        """Smallest canvas wide enough to show every segment plus margin,
-        clamped to [MIN_CANVAS_MM, MAX_CANVAS_MM] and rounded up to the
-        nearest 50 mm so the ruler ticks line up neatly."""
         max_end = 0.0
         for segs in self._segments:
             for s in segs:
                 if s.elem.end_mm > max_end:
                     max_end = s.elem.end_mm
-        target = max(MIN_CANVAS_MM, max_end + CANVAS_MARGIN_MM)
-        target = min(MAX_CANVAS_MM, target)
-        # Round up to a multiple of 50 mm.
-        return float(int((target + 49.999) / 50.0) * 50)
+        return self._clamp_canvas(max_end)
 
     def _maybe_resize_canvas(self, _gun_idx: int) -> None:
         desired = self._canvas_length_mm()
         if abs(desired - self._cur_canvas_mm) >= 1.0:
-            self._rebuild_scene()
+            # Defer the rebuild: this slot can fire from inside a segment's
+            # mouse-release handler, and _rebuild_scene() clears the scene
+            # (deleting the very item whose event is still on the stack).
+            # Running it on the next event-loop tick keeps Qt happy.
+            QTimer.singleShot(0, self._rebuild_scene)
 
     def _add_segment_item(self, gun_idx: int,
                           elem: proto.PatternElement) -> None:
@@ -415,6 +477,7 @@ class PatternEditorView(QGraphicsView):
             ptype_getter=lambda gi=gun_idx: self._gun_types[gi],
             on_committed=on_commit,
             on_request_delete=on_delete,
+            siblings_getter=lambda gi=gun_idx: self._segments[gi],
             color=color,
         )
         self._scene.addItem(seg)
@@ -429,7 +492,14 @@ class PatternEditorView(QGraphicsView):
         self._scene.clear()
         self._segments = [[] for _ in range(proto.NUM_GUNS)]
 
-        canvas_mm = self._canvas_length_mm()
+        # Compute canvas size from the SNAPSHOT (self._segments is now empty,
+        # so reading it here would always collapse back to MIN_CANVAS_MM).
+        max_end = 0.0
+        for _ptype, elems in snap_state:
+            for _s, e_mm, _sp in elems:
+                if e_mm > max_end:
+                    max_end = e_mm
+        canvas_mm = self._clamp_canvas(max_end)
         self._cur_canvas_mm = canvas_mm
         w = mm_to_px(canvas_mm)
         h = self._lane_y(proto.NUM_GUNS) + 8
@@ -460,6 +530,7 @@ class PatternEditorView(QGraphicsView):
             lane.setZValue(-1)
             label = self._scene.addText(f"אקדח {i + 1}", font)
             label.setDefaultTextColor(GUN_COLORS[i])
+            label.document().setDocumentMargin(6)
             label.setPos(8, y + 2)
 
         # Re-add segments from snapshot

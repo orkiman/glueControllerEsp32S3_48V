@@ -27,7 +27,7 @@ class GunPattern:
 
 @dataclass
 class RuntimeConfig:
-    pulses_per_mm: float       = 12.34
+    pulses_per_mm: float       = 1.0
     min_speed_mm_s: float      = 100.0
     photocell_offset_mm: float = 250.0
     debounce_ms: int           = 20
@@ -50,6 +50,7 @@ class AppState(QObject):
     config_changed     = Signal(object)   # RuntimeConfig
     pattern_changed    = Signal(int, object)  # (gun_index_0based, GunPattern)
     log_appended       = Signal(dict)
+    command_sent       = Signal(dict)      # outbound command payload
     connection_changed = Signal(bool, str)
     error_received     = Signal(str, str)  # (cmd, reason)
 
@@ -70,8 +71,15 @@ class AppState(QObject):
         self._ping_timer.start()
 
     # ---- outbound (UI -> firmware) -----------------------------------------
+    def _send(self, payload: dict[str, Any]) -> None:
+        """Single funnel for outbound traffic so we can surface every command
+        in the event log (the 1 Hz ping keep-alive is deliberately silent)."""
+        if payload.get("cmd") != "ping":
+            self.command_sent.emit(payload)
+        self.link.send(payload)
+
     def set_active(self, active: bool) -> None:
-        self.link.send(proto.cmd_set_active(active))
+        self._send(proto.cmd_set_active(active))
 
     def push_config(self, **fields: float) -> None:
         """Apply local edits then publish them live."""
@@ -79,13 +87,13 @@ class AppState(QObject):
             if hasattr(self.config, k):
                 setattr(self.config, k, type(getattr(self.config, k))(v))
         self.config_changed.emit(self.config)
-        self.link.send(proto.cmd_set_config(**fields))
+        self._send(proto.cmd_set_config(**fields))
 
     def push_pattern(self, gun_index_0based: int) -> None:
         gp = self.patterns[gun_index_0based]
         if gp.type == proto.PatternType.NONE:
             return  # firmware refuses 'none'; clear via empty 'lines'/'dots'.
-        self.link.send(proto.cmd_set_pattern(
+        self._send(proto.cmd_set_pattern(
             gun_1based=gun_index_0based + 1,
             ptype=gp.type,
             elements=gp.elements,
@@ -94,16 +102,16 @@ class AppState(QObject):
         self.pattern_changed.emit(gun_index_0based, gp)
 
     def test_open(self, gun_1based: int, timeout_ms: int = 1000) -> None:
-        self.link.send(proto.cmd_test_open(gun_1based, timeout_ms))
+        self._send(proto.cmd_test_open(gun_1based, timeout_ms))
 
     def test_close(self, gun_1based: int = 0) -> None:
-        self.link.send(proto.cmd_test_close(gun_1based))
+        self._send(proto.cmd_test_close(gun_1based))
 
     def calibrate(self, paper_length_mm: float) -> None:
-        self.link.send(proto.cmd_calib_arm(paper_length_mm))
+        self._send(proto.cmd_calib_arm(paper_length_mm))
 
     def sw_trigger(self) -> None:
-        self.link.send(proto.cmd_sw_trigger())
+        self._send(proto.cmd_sw_trigger())
 
     def reset_sheet_count(self) -> None:
         self.status.sheet_count = 0

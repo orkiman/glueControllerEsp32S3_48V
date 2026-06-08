@@ -45,7 +45,7 @@ struct GunPattern {
 
 struct RuntimeConfig {
     // ---- set_config payload (global) ----
-    float    pulses_per_mm        = 12.34f;
+    float    pulses_per_mm        = 1.0f;
     float    min_speed_mm_s       = 100.0f;
     float    photocell_offset_mm  = 250.0f;
     uint32_t debounce_ms          = 20;

@@ -7,11 +7,13 @@ from PySide6.QtWidgets import (QFileDialog, QHBoxLayout, QListWidget,
                                QStackedWidget, QVBoxLayout, QWidget)
 
 from app import profiles
+from app.programs import ProgramStore
 from app.state import AppState
 from ui.screens.configure import ConfigureScreen
 from ui.screens.operate import OperateScreen
 from ui.screens.patterns import PatternsScreen
 from ui.widgets.connection_bar import ConnectionBar
+from ui.widgets.program_bar import ProgramBar
 
 
 class MainWindow(QMainWindow):
@@ -42,12 +44,18 @@ class MainWindow(QMainWindow):
         body.addWidget(self.nav)
         body.addWidget(self.stack, 1)
 
-        # ---- top connection bar + body ----
+        # ---- program store + selector bar (restores last program) ----
+        self.store = ProgramStore()
+        self.program_bar = ProgramBar(state, self.store,
+                                      self._refresh_from_state)
+
+        # ---- top connection bar + program bar + body ----
         root = QWidget()
         v = QVBoxLayout(root)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
         v.addWidget(ConnectionBar(state))
+        v.addWidget(self.program_bar)
         v.addLayout(body, 1)
         self.setCentralWidget(root)
 
@@ -103,11 +111,15 @@ class MainWindow(QMainWindow):
         except (OSError, ValueError) as exc:
             QMessageBox.warning(self, "שגיאת טעינה", str(exc))
             return
-        # Refresh the pattern editor from the freshly-loaded state.
+        self._refresh_from_state()
+        self.statusBar().showMessage(f"נטען: {path}", 4000)
+
+    def _refresh_from_state(self) -> None:
+        """Re-sync the pattern editor and toolbars from the current state
+        (used after loading a profile file or switching programs)."""
         for i in range(len(self.state.patterns)):
             gp = self.state.patterns[i]
             self.patterns_screen.editor.load_pattern(i, gp.type, gp.elements)
             self.patterns_screen.toolbars[i].set_type_from_state(gp.type)
             self.patterns_screen.toolbars[i].set_droplet_from_state(
                 gp.on_timeout_ms)
-        self.statusBar().showMessage(f"נטען: {path}", 4000)

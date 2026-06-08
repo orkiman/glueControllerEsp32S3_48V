@@ -1,0 +1,16 @@
+# PlatformIO
+.pio/
+.pioenvs/
+
+# Python venv
+gui/.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+*.suo
+*.user

@@ -18,7 +18,7 @@ def to_dict(state: AppState) -> dict[str, Any]:
         "config":  asdict(state.config),
         "patterns": [
             {
-                "type": gp.type.value,
+                "type": proto.PatternType(gp.type).value,
                 "on_timeout_ms": gp.on_timeout_ms,
                 "elements": [
                     {"start": e.start_mm, "end": e.end_mm,
@@ -39,6 +39,11 @@ def save_to(path: str | Path, state: AppState) -> None:
 
 def load_from(path: str | Path, state: AppState) -> None:
     obj = json.loads(Path(path).read_text(encoding="utf-8"))
+    apply_dict(obj, state)
+
+
+def apply_dict(obj: dict[str, Any], state: AppState) -> None:
+    """Load a profile dict into `state` and push it live to the firmware."""
     if not isinstance(obj, dict):
         raise ValueError("bad profile file")
 

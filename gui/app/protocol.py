@@ -63,6 +63,8 @@ def cmd_set_pattern(gun_1based: int, ptype: PatternType,
     position driven."""
     if not 1 <= gun_1based <= NUM_GUNS:
         raise ValueError(f"gun out of range: {gun_1based}")
+    # Qt stores str-Enum userData as a plain str, so coerce back defensively.
+    ptype = PatternType(ptype)
     if len(elements) > MAX_ELEMENTS_PER_GUN:
         raise ValueError("too many elements")
     elems: list[dict[str, float]] = []
