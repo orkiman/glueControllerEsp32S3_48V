@@ -91,16 +91,23 @@ static void handleSetPattern(JsonDocument& doc) {
     cfg::PatternType type;
     if      (!strcmp(typeStr, "lines")) type = cfg::PatternType::Lines;
     else if (!strcmp(typeStr, "dots"))  type = cfg::PatternType::Dots;
+    else if (!strcmp(typeStr, "none"))  type = cfg::PatternType::None;
     else { evt::postError("set_pattern","bad_type"); return; }
-
-    JsonArrayConst arr = doc["elements"].as<JsonArrayConst>();
-    if (arr.isNull()) { evt::postError("set_pattern","missing_elements"); return; }
 
     cfg::RuntimeConfig* s = cfg::Config::editScratch();
     cfg::GunPattern&    gp = s->pattern[gunOneBased - 1];
-    const char* reason = nullptr;
-    if (!parsePatternElements(arr, type, gp, reason)) {
-        evt::postError("set_pattern", reason ? reason : "parse_error"); return;
+
+    if (type == cfg::PatternType::None) {
+        gp.type  = cfg::PatternType::None;
+        gp.count = 0;
+    } else {
+        JsonArrayConst arr = doc["elements"].as<JsonArrayConst>();
+        if (arr.isNull()) { evt::postError("set_pattern","missing_elements"); return; }
+
+        const char* reason = nullptr;
+        if (!parsePatternElements(arr, type, gp, reason)) {
+            evt::postError("set_pattern", reason ? reason : "parse_error"); return;
+        }
     }
     // Per-gun on-timeout (covers Peak+Hold; doubles as droplet size in Dots
     // mode and as the long safety ceiling in Lines mode).  Optional --

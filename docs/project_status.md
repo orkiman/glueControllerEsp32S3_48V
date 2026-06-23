@@ -4,9 +4,9 @@
 > The original spec lives in `initial prompt.md` and should not be edited;
 > this file records any decisions, deltas, and the current state.
 
-Last updated: Stage 2 GUI scaffold (PySide6) in progress; per-gun
-`on_timeout_ms` (renamed from `hold_time_ms`, semantics changed to
-"start-of-cycle timer") landed in both firmware and GUI.
+Last updated: Jun 2026. Stage 2 GUI feature-complete (mock-verified).
+Per-gun `on_timeout_ms`, multi-program management, event log filtering,
+dynamic canvas, and overlap prevention all landed.
 
 ---
 
@@ -15,7 +15,7 @@ Last updated: Stage 2 GUI scaffold (PySide6) in progress; per-gun
 | Stage | Scope                                          | Status            |
 | ----- | ---------------------------------------------- | ----------------- |
 | 1     | ESP32-S3 main controller firmware              | **Code complete** — pending hardware bring-up |
-| 2     | PC-side GUI over UART0 (PySide6)               | **In progress** — `gui/` tree; mock-link works, real-link path implemented |
+| 2     | PC-side GUI over UART0 (PySide6)               | **Feature complete** — mock-verified; pending first real-hardware run |
 
 The original Stage 2 plan was an LVGL HMI on a second ESP32-S3 + 7" touch
 panel. **Revised decision:** for now the operator UI runs on a PC and talks
@@ -163,7 +163,32 @@ Example payload:
 
 ---
 
-## 8. Open Items For Bench Bring-Up
+## 8. GUI — Implemented Features (Stage 2 summary)
+
+| Feature | Notes |
+| ------- | ----- |
+| Multi-program management | `app/programs.py` + `ui/widgets/program_bar.py` — dropdown, save, save-as, delete, auto-save, auto-load last |
+| Event log filtering | Routine `status` and `ping_ack` events hidden by default; opt-in checkbox to show them |
+| Outbound command log | All `_send()` calls (except ping) appear in the event log |
+| Dynamic canvas | Canvas grows automatically when a segment is dragged or added outside current bounds |
+| Overlap prevention | Drag, handle resize, and double-click add all prevent segment overlap |
+| Hebrew RTL fixes | Group-box title padding widened; lane labels use document margin |
+| Encoder calibration | `calib_arm` command + `calib_result` event updates `pulses_per_mm` live |
+| Dark RTL theme | `styles.qss` + `Qt.RightToLeft` layout direction |
+
+To run:
+```powershell
+# Mock (no hardware needed):
+cd gui
+.venv\Scripts\python run.py --mock
+
+# Real hardware:
+.venv\Scripts\python run.py
+```
+
+---
+
+## 9. Open Items For Bench Bring-Up
 
 - **`Adafruit_MCP4728::fastWrite` signature** — assumed `(uint16_t, uint16_t, uint16_t, uint16_t)` returning `bool`; will fail at compile if the installed lib differs.
 - **PCNT glitch filter** at 100 APB ticks (~1.25 µs). Will tune once we see the 6N137's real edge behaviour on the scope.
@@ -178,7 +203,7 @@ Example payload:
 
 ---
 
-## 9. File Tree (current)
+## 10. File Tree (current)
 
 ```
 platformio.ini
@@ -203,6 +228,7 @@ gui/                           (PySide6 operator UI)
     serial_link.py             pyserial-backed real transport
     state.py                   AppState — single source of truth
     profiles.py                Save/load full operator profile (JSON)
+    programs.py                Persistent named-program store (auto-save/load)
   ui/
     main_window.py             Sidebar (הפעלה / תוכנית / הגדרות) + menu
     styles.qss                 Dark theme
@@ -212,4 +238,5 @@ gui/                           (PySide6 operator UI)
     widgets/connection_bar.py  COM picker / Connect / Active / E-stop
     widgets/numeric_field.py   Debounced labelled spinbox
     widgets/pattern_editor.py  QGraphicsScene-based segment editor
+    widgets/program_bar.py     Program selector / save-as / delete toolbar
 ```

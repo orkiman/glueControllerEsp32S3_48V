@@ -1,13 +1,17 @@
 """Top bar: COM picker + connect/disconnect + status LED."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QPushButton,
                                QWidget)
 
 from app.serial_link import SerialLink, list_ports
 from app.state import AppState
+
+
+SETTINGS = QSettings("orkiman", "glue_controller")
+LAST_PORT_KEY = "last_port"
 
 
 class StatusLed(QWidget):
@@ -37,6 +41,7 @@ class ConnectionBar(QWidget):
 
         self.combo = QComboBox()
         self.combo.setMinimumWidth(260)
+        self.combo.currentIndexChanged.connect(self._on_port_changed)
         self.btn   = QPushButton("התחבר")
         self.btn.clicked.connect(self._toggle)
         self.refresh = QPushButton("רענן")
@@ -65,11 +70,28 @@ class ConnectionBar(QWidget):
             self.refresh.setEnabled(False)
 
     def _populate(self) -> None:
+        self.combo.blockSignals(True)
         self.combo.clear()
-        for dev, desc in list_ports():
+        last = SETTINGS.value(LAST_PORT_KEY, "")
+        select_idx = -1
+        for i, (dev, desc) in enumerate(list_ports()):
             self.combo.addItem(f"{dev} — {desc}", dev)
+            if dev == last:
+                select_idx = i
         if self.combo.count() == 0:
             self.combo.addItem("(לא נמצאו יציאות)", None)
+        elif select_idx >= 0:
+            self.combo.setCurrentIndex(select_idx)
+        self.combo.blockSignals(False)
+
+    def _on_port_changed(self, _idx: int) -> None:
+        if not isinstance(self.state.link, SerialLink):
+            return
+        port = self.combo.currentData()
+        if self.state.link.connected:
+            self.state.link.close()
+        if port:
+            self.state.link.open(port)
 
     def _toggle(self) -> None:
         link = self.state.link
@@ -85,6 +107,9 @@ class ConnectionBar(QWidget):
         if ok:
             self.status_label.setText(f"מחובר ({reason})")
             self.btn.setText("נתק")
+            port = self.combo.currentData()
+            if port:
+                SETTINGS.setValue(LAST_PORT_KEY, port)
         else:
             self.status_label.setText("מנותק" if not reason else f"מנותק — {reason}")
             self.btn.setText("התחבר")

@@ -1,6 +1,7 @@
 """Patterns screen — per-gun toolbar + multi-lane visual editor."""
 from __future__ import annotations
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (QComboBox, QGridLayout, QGroupBox, QHBoxLayout,
                                QLabel, QPushButton, QVBoxLayout, QWidget)
 
@@ -54,6 +55,14 @@ class GunToolbar(QGroupBox):
         btn_test.toggled.connect(self._on_test_toggled)
         self.btn_test = btn_test
 
+        # The firmware does not emit a dedicated "test finished" event, so we
+        # use the button checked state as the running indicator and release it
+        # when the chosen timeout expires or an error is reported.
+        self._test_timer = QTimer(self)
+        self._test_timer.setSingleShot(True)
+        self._test_timer.timeout.connect(self._release_test_button)
+        state.error_received.connect(self._on_test_error)
+
         row1 = QHBoxLayout()
         row1.addWidget(QLabel("סוג:"))
         row1.addWidget(self.type_combo, 1)
@@ -82,6 +91,13 @@ class GunToolbar(QGroupBox):
         self.editor.set_gun_type(self.gun_idx, ptype)
         self.f_droplet.setEnabled(ptype == proto.PatternType.DOTS)
 
+        gp = self.state.patterns[self.gun_idx]
+        gp.type = ptype
+        gp.elements = [] if ptype == proto.PatternType.NONE else [
+            e for e in self.editor.export_pattern(self.gun_idx)[1]
+        ]
+        self.state.push_pattern(self.gun_idx)
+
     def _on_on_timeout_changed(self, v: float) -> None:
         self.state.patterns[self.gun_idx].on_timeout_ms = float(v)
         # Push only if the pattern actually exists on the firmware.
@@ -90,10 +106,25 @@ class GunToolbar(QGroupBox):
 
     def _on_test_toggled(self, on: bool) -> None:
         gun_1based = self.gun_idx + 1
+        self.btn_test.setText("עצור בדיקה" if on else "בדיקה")
         if on:
             self.state.test_open(gun_1based, timeout_ms=5000)
+            self._test_timer.start(5000)
         else:
+            self._test_timer.stop()
             self.state.test_close(gun_1based)
+
+    def _release_test_button(self) -> None:
+        self._test_timer.stop()
+        if self.btn_test.isChecked():
+            self.btn_test.blockSignals(True)
+            self.btn_test.setChecked(False)
+            self.btn_test.blockSignals(False)
+        self.btn_test.setText("בדיקה")
+
+    def _on_test_error(self, cmd: str, _reason: str) -> None:
+        if cmd == "test_open":
+            self._release_test_button()
 
 
 class PatternsScreen(QWidget):

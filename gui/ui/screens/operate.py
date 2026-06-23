@@ -70,7 +70,7 @@ class OperateScreen(QWidget):
             self.lbl_state[0].setText("● פעיל")
             self.lbl_state[0].setStyleSheet("color:#22c55e;")
         else:
-            self.lbl_state[0].setText("○ עצור")
+            self.lbl_state[0].setText("○ לא פעיל")
             self.lbl_state[0].setStyleSheet("color:#9ca6b3;")
         self.lbl_speed[0].setText(f"{s.speed_mm_s:.0f} mm/s")
         self.lbl_sheets[0].setText(str(s.sheet_count))

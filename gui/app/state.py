@@ -91,8 +91,6 @@ class AppState(QObject):
 
     def push_pattern(self, gun_index_0based: int) -> None:
         gp = self.patterns[gun_index_0based]
-        if gp.type == proto.PatternType.NONE:
-            return  # firmware refuses 'none'; clear via empty 'lines'/'dots'.
         self._send(proto.cmd_set_pattern(
             gun_1based=gun_index_0based + 1,
             ptype=gp.type,
