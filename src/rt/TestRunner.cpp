@@ -107,6 +107,9 @@ void init() {
 }
 
 bool start(uint8_t gunOneBased, uint32_t timeout_ms) {
+    // Peak diagnostics are only interesting during a manual test; leave them
+    // off during production pattern firing to keep the event stream quiet.
+    seq::setDiag(true);
     if (gunOneBased == 0) {
         bool any = false;
         for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
@@ -128,6 +131,7 @@ void stop(uint8_t gunOneBased) {
 
 void stopAll() {
     for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) doStop(g);
+    seq::setDiag(false);
 }
 
 } // namespace testrun

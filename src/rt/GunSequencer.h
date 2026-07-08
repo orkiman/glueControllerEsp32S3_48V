@@ -57,4 +57,10 @@ bool  isBusy(uint8_t gunIdx);
 // Called by Config when set_config publishes a new threshold table.
 void onConfigApplied();
 
+// Enable/disable per-gun peak-detection diagnostics.  When on, each fire()
+// emits a `debug` event on peak trip ("peak" + us since fire) or, if the
+// on-timer expires without a trip, a "nopeak" event.  TestRunner turns this
+// on only for the duration of a manual test so normal production stays quiet.
+void setDiag(bool on);
+
 } // namespace seq

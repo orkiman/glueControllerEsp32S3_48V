@@ -42,6 +42,12 @@ static void emitterTask(void*) {
             case Kind::WatchdogTimeout:
                 doc["event"] = "watchdog_timeout";
                 break;
+            case Kind::Debug:
+                doc["event"] = "debug";
+                doc["tag"]   = e.cmd;      // "peak" / "nopeak"
+                doc["gun"]   = e.b1;       // 1-based gun
+                doc["us"]    = e.f1;       // microseconds since fire()
+                break;
         }
         size_t n = serializeJson(doc, line, sizeof(line) - 2);
         line[n++] = '\n';

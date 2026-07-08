@@ -8,6 +8,9 @@
 #include <esp_timer.h>
 #include <atomic>
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 namespace seq {
 
 // Tunable: the Phase-3 "near zero" threshold (volts).
@@ -28,9 +31,24 @@ struct GunRt {
     float               vPick   = 2.0f;
     float               vHold   = 0.8f;
     float               vNearZ  = NEAR_ZERO_V;
+    // Same thresholds pre-converted to raw 12-bit DAC codes.  ISR paths MUST
+    // use these (via dac::requestCode) -- converting volts->code needs the FPU,
+    // which is disabled in interrupt context (Coprocessor exception -> reboot).
+    uint16_t            cPick   = 0;
+    uint16_t            cHold   = 0;
+    uint16_t            cNearZ  = 0;
+    // Diagnostics: when did this fire() start, and did a peak trip arrive?
+    volatile int64_t    fireUs  = 0;
+    volatile bool       peakSeen = false;
+    volatile uint32_t   peakDtUs = 0;     // time-to-peak (us), integer only
 };
 
 static GunRt s_g[pins::NUM_GUNS];
+
+// When true, fire() reports peak-trip timing per gun via `debug` events.
+static std::atomic<bool> s_diag{false};
+
+void setDiag(bool on) { s_diag.store(on, std::memory_order_release); }
 
 // ---------- helpers ----------
 static inline bool systemArmed() {
@@ -41,7 +59,7 @@ static inline bool systemArmed() {
 // ---------- Phase 3 entry ----------
 static void IRAM_ATTR enterPhase3(uint8_t g) {
     s_g[g].phase.store(Phase::Decay, std::memory_order_release);
-    dac::requestThreshold(g, s_g[g].vNearZ);
+    dac::requestCode(g, s_g[g].cNearZ);   // ISR-safe (no FPU); reachable via faultIsr
     drv::setIn1(g, false);            // MUX_SELECT stays HIGH -> reverse drive
     // Hardware completes the active fast decay autonomously.  Mark idle.
     s_g[g].phase.store(Phase::Idle, std::memory_order_release);
@@ -56,6 +74,22 @@ static void onTimerCb(void* user) {
     // late LM339 edge could re-enter peakIsr after we already dropped to
     // Phase 3 below.
     gpio_intr_disable((gpio_num_t)pins::PEAK_IRQ[g]);
+    if (s_diag.load(std::memory_order_acquire)) {
+        // Report the outcome of this fire cycle.  Runs in esp_timer TASK
+        // context, so floating-point (e.f1) is safe here -- unlike peakIsr,
+        // which only records integer state.
+        //   "peak"   -> LM339 signalled peak; e.f1 = time-to-peak (us)
+        //   "nopeak" -> on-timer expired first (open coil / dead comparator /
+        //               miswired sense / threshold never reached)
+        evt::Event e{}; e.kind = evt::Kind::Debug;
+        const char* tag = s_g[g].peakSeen ? "peak" : "nopeak";
+        strncpy(e.cmd, tag, sizeof(e.cmd) - 1);
+        e.b1 = (uint8_t)(g + 1);
+        e.f1 = s_g[g].peakSeen
+                   ? (float)s_g[g].peakDtUs
+                   : (float)(esp_timer_get_time() - s_g[g].fireUs);
+        evt::post(e);
+    }
     enterPhase3(g);
 }
 
@@ -70,9 +104,16 @@ static void IRAM_ATTR peakIsr(void* arg) {
     s_g[g].phase.store(Phase::Hold, std::memory_order_release);
 
     // Update DAC to hold threshold; LM339 will autonomously chop from here.
-    // No timer action here -- the on-timer was already armed by fire() and
-    // continues to count the remaining on-time budget.
-    dac::requestThreshold(g, s_g[g].vHold);
+    // MUST use the integer requestCode() path: this is ISR context and the
+    // FPU is disabled here (a float volts->code conversion caused the
+    // "Coprocessor exception" reboot).  No timer action -- the on-timer armed
+    // by fire() keeps counting the remaining on-time budget.
+    dac::requestCode(g, s_g[g].cHold);
+
+    // Diagnostics: record integer state only (no FPU in ISR).  onTimerCb emits
+    // the "peak"/"nopeak" event later in task context where float is allowed.
+    s_g[g].peakDtUs = (uint32_t)(esp_timer_get_time() - s_g[g].fireUs);
+    s_g[g].peakSeen = true;
 }
 
 // ---------- init helpers ----------
@@ -117,6 +158,11 @@ void onConfigApplied() {
         s_g[g].vPick  = vPick;
         s_g[g].vHold  = vHold;
         s_g[g].vNearZ = NEAR_ZERO_V;
+        // Pre-convert to raw codes here (task context, FPU available) so the
+        // ISR paths never touch floating point.
+        s_g[g].cPick  = dac::codeForVolts(vPick);
+        s_g[g].cHold  = dac::codeForVolts(vHold);
+        s_g[g].cNearZ = dac::codeForVolts(NEAR_ZERO_V);
     }
 }
 
@@ -141,13 +187,22 @@ bool IRAM_ATTR fire(uint8_t g, uint32_t onMs) {
     if (onUs < 50)        onUs = 50;          // 50 us minimum sanity
     if (onUs > 5'000'000) onUs = 5'000'000;   // 5 s hard ceiling
 
+    // Diagnostics: stamp the start and clear the peak-seen flag so onTimerCb
+    // can tell whether the LM339 ever signalled peak for this gun.
+    s_g[g].fireUs   = esp_timer_get_time();
+    s_g[g].peakSeen = false;
+
     // Phase 1: arm DAC to pick, drive IN1, route LM339 to IN2, enable peak IRQ.
-    dac::requestThreshold(g, s_g[g].vPick);
+    dac::requestCode(g, s_g[g].cPick);
     drv::setMuxSelect(g, true);     // S=1 -> LM339 drives IN2
     drv::setIn1     (g, true);
     gpio_intr_enable((gpio_num_t)pins::PEAK_IRQ[g]);
     // Arm the full-cycle on-timer NOW so that "stuck in Peak" cannot last
-    // longer than `onUs` even if the LM339 peak trip never arrives.
+    // longer than `onUs` even if the LM339 peak trip never arrives.  A
+    // previous abort from ISR context (faultIsr) may have left a stale timer
+    // armed -- stop it first so the start cannot fail with INVALID_STATE.
+    // fire() always runs in task context, so esp_timer_stop is safe here.
+    esp_timer_stop(s_g[g].onTimer);
     esp_timer_start_once(s_g[g].onTimer, onUs);
     return true;
 }
@@ -158,7 +213,14 @@ void IRAM_ATTR abort(uint8_t g) {
     if (p == Phase::Idle) return;
 
     gpio_intr_disable((gpio_num_t)pins::PEAK_IRQ[g]);
-    esp_timer_stop(s_g[g].onTimer);
+    // esp_timer_stop() is NOT safe to call from an ISR (faultIsr -> abortAll
+    // runs in interrupt context and would panic/reboot).  When called from a
+    // task we stop the timer immediately; in ISR context we leave it armed --
+    // it is one-shot and onTimerCb only re-enters Phase 3, which is harmless
+    // once we are already Idle, and fire() stops any stale timer before reuse.
+    if (!xPortInIsrContext()) {
+        esp_timer_stop(s_g[g].onTimer);
+    }
     enterPhase3(g);
 }
 

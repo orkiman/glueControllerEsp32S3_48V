@@ -20,6 +20,7 @@ enum class Kind : uint8_t {
     CalibResult,         // {"event":"calib_result","pulses_per_mm":X}
     Status,              // {"event":"status",...}
     WatchdogTimeout,     // {"event":"watchdog_timeout"}
+    Debug,               // {"event":"debug","tag":"..","gun":N,"us":X}
 };
 
 // Short fixed-width string fields keep the queue element trivially copyable.

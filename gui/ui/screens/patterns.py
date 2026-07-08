@@ -62,6 +62,8 @@ class GunToolbar(QGroupBox):
         self._test_timer.setSingleShot(True)
         self._test_timer.timeout.connect(self._release_test_button)
         state.error_received.connect(self._on_test_error)
+        state.connection_changed.connect(self._update_test_enabled)
+        state.status_changed.connect(self._update_test_enabled)
 
         row1 = QHBoxLayout()
         row1.addWidget(QLabel("סוג:"))
@@ -82,6 +84,13 @@ class GunToolbar(QGroupBox):
             self.type_combo.blockSignals(False)
         # Droplet field is meaningful only for Dots — disable otherwise.
         self.f_droplet.setEnabled(ptype == proto.PatternType.DOTS)
+        self._update_test_enabled()
+
+    def _update_test_enabled(self, _ok: bool = False, _reason: str = "") -> None:
+        enabled = (self.state.link.connected and
+                   self.state.status.active and
+                   self.state.patterns[self.gun_idx].type != proto.PatternType.NONE)
+        self.btn_test.setEnabled(enabled)
 
     def set_droplet_from_state(self, on_timeout_ms: float) -> None:
         self.f_droplet.setValue(on_timeout_ms)
@@ -97,6 +106,9 @@ class GunToolbar(QGroupBox):
             e for e in self.editor.export_pattern(self.gun_idx)[1]
         ]
         self.state.push_pattern(self.gun_idx)
+        self._update_test_enabled()
+        if ptype == proto.PatternType.NONE:
+            self._release_test_button()
 
     def _on_on_timeout_changed(self, v: float) -> None:
         self.state.patterns[self.gun_idx].on_timeout_ms = float(v)

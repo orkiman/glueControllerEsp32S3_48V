@@ -108,6 +108,10 @@ class SerialLink(LinkBase):
         try:
             obj = json.loads(line)
         except json.JSONDecodeError:
+            # Not JSON: almost always firmware boot banner or an ESP32 panic
+            # dump (Guru Meditation / backtrace).  Surface it as a `raw` event
+            # so crashes are visible in the log instead of vanishing.
+            self.event_received.emit({"event": "raw", "text": line})
             return
         if isinstance(obj, dict):
             self.event_received.emit(obj)

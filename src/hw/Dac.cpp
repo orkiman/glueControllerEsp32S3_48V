@@ -30,9 +30,12 @@ static inline uint16_t voltsToCode(float v) {
     return (uint16_t)(code + 0.5f);
 }
 
-void IRAM_ATTR requestThreshold(uint8_t g, float v) {
+uint16_t codeForVolts(float v) { return voltsToCode(v); }
+
+// Pure integer path -- safe from ANY context (task or ISR).  No FPU use.
+void IRAM_ATTR requestCode(uint8_t g, uint16_t code) {
     if (g >= pins::NUM_GUNS) return;
-    s_shadow[g].store(voltsToCode(v), std::memory_order_release);
+    s_shadow[g].store(code, std::memory_order_release);
     if (!s_task) return;
 
     if (xPortInIsrContext()) {
@@ -42,6 +45,11 @@ void IRAM_ATTR requestThreshold(uint8_t g, float v) {
     } else {
         xTaskNotifyGive(s_task);
     }
+}
+
+// TASK CONTEXT ONLY: voltsToCode() uses the FPU, which is unavailable in ISRs.
+void requestThreshold(uint8_t g, float v) {
+    requestCode(g, voltsToCode(v));
 }
 
 static void writeAllChannels() {

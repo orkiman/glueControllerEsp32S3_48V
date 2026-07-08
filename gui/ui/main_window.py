@@ -69,6 +69,12 @@ class MainWindow(QMainWindow):
     def _on_error(self, cmd: str, reason: str) -> None:
         self.statusBar().showMessage(f"שגיאה: {cmd} → {reason}", 4000)
 
+    def closeEvent(self, event) -> None:  # noqa: N802
+        # Make sure the serial worker thread is stopped before the UI is torn
+        # down; otherwise Qt prints "QThread destroyed while still running".
+        self.state.link.close()
+        event.accept()
+
     # ---- menu ---------------------------------------------------------------
     def _build_menu(self) -> None:
         mb = self.menuBar()

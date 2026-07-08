@@ -104,6 +104,7 @@ def cmd_sw_trigger() -> dict[str, Any]:
 # Event names (received from firmware).
 # -----------------------------------------------------------------------------
 
+EVT_READY            = "ready"
 EVT_STATUS           = "status"
 EVT_ACK              = "ack"
 EVT_ERROR            = "error"

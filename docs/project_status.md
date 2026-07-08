@@ -175,6 +175,15 @@ Example payload:
 | Hebrew RTL fixes | Group-box title padding widened; lane labels use document margin |
 | Encoder calibration | `calib_arm` command + `calib_result` event updates `pulses_per_mm` live |
 | Dark RTL theme | `styles.qss` + `Qt.RightToLeft` layout direction |
+| Live pattern type push | Toolbar combo changes push `set_pattern` immediately to the firmware |
+| `set_pattern type:none` | Firmware now accepts `none` to clear/disable a gun |
+| COM port persistence | Dropdown auto-selects the last port, switches ports when changed, and saves the last connected port |
+| Auto-sync on reconnect | Config + all patterns are pushed automatically when the serial link opens, so startup program loads are not lost |
+| Resync on firmware reboot | GUI re-pushes full state whenever a `ready` event arrives (USB-CDC link survives an ESP reboot, so the connect signal never drops) |
+| ISR-safe abort (firmware) | `seq::abort` no longer calls `esp_timer_stop` from `faultIsr` (ISR context) — this was panicking/rebooting the ESP32 on every `test_open` when nFAULT asserted (e.g. DRV8262 with no 48 V) |
+| Clean shutdown | `MainWindow.closeEvent` closes the serial thread before exit to avoid QThread warnings |
+| Test button safety | Test button disabled when disconnected or system inactive; shows "עצור בדיקה" while running; auto-releases on timeout/error |
+| `test_open` errors | `not_active` / `no_pattern` / `busy` / `hardware_fault` (previously all collapsed into `no_pattern_or_busy`) |
 
 To run:
 ```powershell

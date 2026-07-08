@@ -36,12 +36,25 @@ void onCalibArm(float paperLengthMm) {
 }
 
 void onTestOpen(uint8_t gun, uint32_t timeout_ms) {
-    if (cfg::g_sys.fault.load(std::memory_order_acquire)) return;
+    if (cfg::g_sys.fault.load(std::memory_order_acquire)) {
+        evt::postError("test_open", "hardware_fault");
+        return;
+    }
+    if (!cfg::g_sys.active.load(std::memory_order_acquire)) {
+        evt::postError("test_open", "not_active");
+        return;
+    }
     // Behaviour follows the gun's configured pattern type:
     //   Lines -> single line held for timeout_ms (hardware-regulated).
     //   Dots  -> 20 Hz dot train until timeout_ms or test_close.
+    if (gun > 0 && gun <= pins::NUM_GUNS) {
+        if (cfg::Config::active()->pattern[gun - 1].type == cfg::PatternType::None) {
+            evt::postError("test_open", "no_pattern");
+            return;
+        }
+    }
     if (!testrun::start(gun, timeout_ms)) {
-        evt::postError("test_open", "no_pattern_or_busy");
+        evt::postError("test_open", "busy");
     }
 }
 

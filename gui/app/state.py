@@ -119,7 +119,11 @@ class AppState(QObject):
     def _on_event(self, ev: dict[str, Any]) -> None:
         self.log_appended.emit(ev)
         kind = ev.get("event", "")
-        if kind == proto.EVT_STATUS:
+        if kind == proto.EVT_READY:
+            # Firmware (re)booted; its RAM config is back to defaults. Resync
+            # so a reboot mid-session does not silently drop our patterns.
+            self.push_full_state()
+        elif kind == proto.EVT_STATUS:
             s = self.status
             s.active      = bool(ev.get("active", s.active))
             s.fault       = bool(ev.get("fault", s.fault))
@@ -135,8 +139,30 @@ class AppState(QObject):
                 self.config.pulses_per_mm = float(ppm)
                 self.config_changed.emit(self.config)
 
+    def push_full_state(self) -> None:
+        """Re-send config + every gun pattern + active flag to the firmware.
+
+        Used after the link first connects and whenever the firmware reboots
+        (it announces itself with a `ready` event over the same USB-CDC link,
+        so the connection signal never drops and we must resync explicitly)."""
+        self._send(proto.cmd_set_config(
+            pulses_per_mm=self.config.pulses_per_mm,
+            min_speed_mm_s=self.config.min_speed_mm_s,
+            photocell_offset_mm=self.config.photocell_offset_mm,
+            debounce_ms=self.config.debounce_ms,
+            pick_current_a=self.config.pick_current_a,
+            hold_current_a=self.config.hold_current_a,
+        ))
+        for i in range(proto.NUM_GUNS):
+            self.push_pattern(i)
+        self._send(proto.cmd_set_active(self.status.active))
+
     def _on_link_conn(self, ok: bool, reason: str) -> None:
         self.connection_changed.emit(ok, reason)
+        if ok:
+            # The program auto-loads from disk before the link is ready, so
+            # push the current state now that we have a live connection.
+            self.push_full_state()
 
     def _ping(self) -> None:
         if self.link.connected:

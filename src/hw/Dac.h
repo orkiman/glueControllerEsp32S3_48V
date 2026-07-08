@@ -27,8 +27,20 @@ namespace dac {
 bool init();                                                  // I2C + chip + DacTask
 
 // Request a new threshold (in volts, 0..VDD) for one gun.  Returns immediately.
-// Safe from any context including ISR.
-void requestThreshold(uint8_t gunIdx, float volts) IRAM_ATTR;
+// TASK CONTEXT ONLY: performs floating-point math (volts->code).  Calling this
+// from an ISR triggers a Coprocessor exception (the ESP32 FPU is disabled in
+// interrupt context).  From ISR paths, precompute the code with codeForVolts()
+// in task context and call requestCode() instead.
+void requestThreshold(uint8_t gunIdx, float volts);
+
+// Request a new raw 12-bit DAC code for one gun.  Pure integer path, so it is
+// safe from ANY context including ISR.  Returns immediately.
+void requestCode(uint8_t gunIdx, uint16_t code) IRAM_ATTR;
+
+// Convert a threshold voltage (0..VDD) to its 12-bit DAC code.  Uses float
+// math, so call it from task context (e.g. when config changes) and cache the
+// result for ISR-time use via requestCode().
+uint16_t codeForVolts(float volts);
 
 // Convenience: convert amps -> volts using INA240 transfer (Vout = 2*I).
 inline float ampsToVolts(float a) { return a * 2.0f; }
