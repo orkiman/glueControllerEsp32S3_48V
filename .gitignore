@@ -14,3 +14,16 @@ __pycache__/
 .vscode/
 *.suo
 *.user
+
+# KiCAD generated files
+*-backups/
+*.kicad_sch-bak
+*.kicad_pcb-bak
+*.kicad_prl
+*.net
+*.plt
+fp-info-cache
+
+# KiCAD/hardware library conversion artifacts & exports
+hardware/*.pdf
+hardware/myLibs/**/*.bak
