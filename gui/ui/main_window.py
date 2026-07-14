@@ -4,7 +4,8 @@ from __future__ import annotations
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (QFileDialog, QHBoxLayout, QListWidget,
                                QListWidgetItem, QMainWindow, QMessageBox,
-                               QStackedWidget, QVBoxLayout, QWidget)
+                               QSizePolicy, QStackedWidget, QVBoxLayout,
+                               QWidget)
 
 from app import profiles
 from app.programs import ProgramStore
@@ -22,6 +23,8 @@ class MainWindow(QMainWindow):
         self.state = state
         self.setWindowTitle("בקר דבק קר — תוכנת הפעלה")
         self.resize(1200, 760)
+        self.setMinimumSize(800, 500)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
 
         # ---- nav sidebar ----
         self.nav = QListWidget()
