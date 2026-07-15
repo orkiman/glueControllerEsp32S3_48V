@@ -14,19 +14,13 @@ class OperateScreen(QWidget):
         self.state = state
 
         # ---- big actions ----
-        self.btn_start = QPushButton("הפעל")
-        self.btn_start.setObjectName("PrimaryButton")
-        self.btn_start.setMinimumHeight(72)
-        self.btn_start.clicked.connect(lambda: state.set_active(True))
-
-        self.btn_stop = QPushButton("עצור")
-        self.btn_stop.setObjectName("DangerButton")
-        self.btn_stop.setMinimumHeight(72)
-        self.btn_stop.clicked.connect(lambda: state.set_active(False))
+        self.btn_action = QPushButton("הפעל")
+        self.btn_action.setObjectName("PrimaryButton")
+        self.btn_action.setMinimumHeight(72)
+        self.btn_action.clicked.connect(self._toggle_active)
 
         actions = QHBoxLayout()
-        actions.addWidget(self.btn_start, 1)
-        actions.addWidget(self.btn_stop, 1)
+        actions.addWidget(self.btn_action, 1)
 
         # ---- live stats ----
         self.lbl_state = self._stat("מצב", "—")
@@ -62,6 +56,9 @@ class OperateScreen(QWidget):
         c = QLabel(caption); c.setObjectName("StatCaption")
         return v, c
 
+    def _toggle_active(self) -> None:
+        self.state.set_active(not self.state.status.active)
+
     def _on_status(self, s: LiveStatus) -> None:
         if s.fault:
             self.lbl_state[0].setText("⚠ תקלה")
@@ -69,9 +66,15 @@ class OperateScreen(QWidget):
         elif s.active:
             self.lbl_state[0].setText("● פעיל")
             self.lbl_state[0].setStyleSheet("color:#22c55e;")
+            self.btn_action.setText("עצור")
+            self.btn_action.setObjectName("DangerButton")
+            self.btn_action.setStyleSheet("")
         else:
             self.lbl_state[0].setText("○ לא פעיל")
-            self.lbl_state[0].setStyleSheet("color:#9ca6b3;")
+            self.lbl_state[0].setStyleSheet("color:#ef4444;")
+            self.btn_action.setText("הפעל")
+            self.btn_action.setObjectName("PrimaryButton")
+            self.btn_action.setStyleSheet("")
         self.lbl_speed[0].setText(f"{s.speed_mm_s:.0f} mm/s")
         self.lbl_sheets[0].setText(str(s.sheet_count))
 
