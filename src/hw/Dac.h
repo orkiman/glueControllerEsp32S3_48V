@@ -45,6 +45,13 @@ uint16_t codeForVolts(float volts);
 // Convenience: convert amps -> volts using INA240 transfer (Vout = 2*I).
 inline float ampsToVolts(float a) { return a * 2.0f; }
 
+// TASK CONTEXT ONLY: set one channel's raw code and push it to the chip
+// synchronously (blocking I2C, ~225 us).  Use this from fire() to guarantee the
+// pick threshold is physically present on the DAC output *before* the coil is
+// energised, so the LM339 does not trip against the stale threshold from the
+// previous cycle and regulate at hold current immediately.
+void blockingSetCode(uint8_t gunIdx, uint16_t code);
+
 // Force-write everything to a single low value (used on emergencyShutdown).
 // Blocks briefly on I2C; call from task context only.
 void blockingZeroAll();

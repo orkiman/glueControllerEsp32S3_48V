@@ -193,7 +193,22 @@ bool IRAM_ATTR fire(uint8_t g, uint32_t onMs) {
     s_g[g].peakSeen = false;
 
     // Phase 1: arm DAC to pick, drive IN1, route LM339 to IN2, enable peak IRQ.
-    dac::requestCode(g, s_g[g].cPick);
+    //
+    // The pick threshold MUST be physically on the DAC output *before* we drive
+    // IN1 and arm the peak IRQ.  The async requestCode() path only queues a
+    // shadow write for dacTask, which lands ~225 us later; by then the coil is
+    // already ramping against the STALE threshold left by the previous cycle
+    // (cNearZ ~0.10 V, or 0 on the very first shot).  The LM339 trips against
+    // that low reference almost immediately, peakIsr switches to hold, and the
+    // gun regulates at HOLD current from the outset -- so the pick-current
+    // setting appears to do nothing on the scope.  fire() always runs in task
+    // context (esp_timer TASK callbacks / pattern task), so a blocking I2C write
+    // is safe here; guard against the IRAM/ISR case just in case.
+    if (!xPortInIsrContext()) {
+        dac::blockingSetCode(g, s_g[g].cPick);   // synchronous: present before drive
+    } else {
+        dac::requestCode(g, s_g[g].cPick);
+    }
     drv::setMuxSelect(g, true);     // S=1 -> LM339 drives IN2
     drv::setIn1     (g, true);
     gpio_intr_enable((gpio_num_t)pins::PEAK_IRQ[g]);

@@ -5,6 +5,7 @@
 #include <Adafruit_MCP4728.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <freertos/semphr.h>
 
 namespace dac {
 
@@ -14,6 +15,9 @@ static constexpr uint16_t DAC_FULL_SCALE = 4095;
 static Adafruit_MCP4728  s_chip;
 static TaskHandle_t      s_task         = nullptr;
 static std::atomic<bool> s_chipReady{false};
+// Serializes chip access so a synchronous blockingSetCode() (called from
+// fire() on the RT core) can never collide on the I2C bus with dacTask.
+static SemaphoreHandle_t s_i2cMux       = nullptr;
 
 // Shadow of the desired DAC codes for each channel.
 static std::atomic<uint16_t> s_shadow[pins::NUM_GUNS];
@@ -55,21 +59,41 @@ void requestThreshold(uint8_t g, float v) {
 static void writeAllChannels() {
     if (!s_chipReady.load(std::memory_order_acquire)) return;
 
+    // Serialize with any other context touching the chip (dacTask vs the
+    // synchronous blockingSetCode() called from fire()).  Must only be called
+    // from task context -- never an ISR.
+    if (s_i2cMux) xSemaphoreTake(s_i2cMux, portMAX_DELAY);
+
     uint16_t snap[pins::NUM_GUNS];
     bool dirty = false;
     for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
         snap[g] = s_shadow[g].load(std::memory_order_acquire);
         if (snap[g] != s_lastWritten[g]) dirty = true;
     }
-    if (!dirty) return;
-
-    // fastWrite uses Vref=VDD, gain=1, normal mode for all channels in one I2C txn.
-    bool ok = s_chip.fastWrite(snap[0], snap[1], snap[2], snap[3]);
-    if (ok) {
-        for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) s_lastWritten[g] = snap[g];
-    } else {
-        evt::postError("dac", "i2c_write_failed");
+    if (dirty) {
+        // fastWrite uses Vref=VDD, gain=1, normal mode for all channels in one I2C txn.
+        bool ok = s_chip.fastWrite(snap[0], snap[1], snap[2], snap[3]);
+        if (ok) {
+            for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) s_lastWritten[g] = snap[g];
+        } else {
+            evt::postError("dac", "i2c_write_failed");
+        }
     }
+
+    if (s_i2cMux) xSemaphoreGive(s_i2cMux);
+}
+
+// TASK CONTEXT ONLY: set one channel's code and push it to the chip
+// synchronously (blocking I2C).  fire() uses this to guarantee the pick
+// threshold is physically present on the DAC output *before* the coil is
+// energised -- otherwise the comparator would trip against the stale
+// (near-zero) threshold from the previous cycle and we'd regulate at hold
+// current immediately, making the pick-current setting look like it does
+// nothing.
+void blockingSetCode(uint8_t g, uint16_t code) {
+    if (g >= pins::NUM_GUNS) return;
+    s_shadow[g].store(code, std::memory_order_release);
+    writeAllChannels();
 }
 
 static void dacTask(void*) {
@@ -82,6 +106,8 @@ static void dacTask(void*) {
 
 bool init() {
     for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) s_shadow[g].store(0);
+
+    if (!s_i2cMux) s_i2cMux = xSemaphoreCreateMutex();
 
     Wire.begin(pins::I2C_SDA, pins::I2C_SCL);
     Wire.setClock(400000);
