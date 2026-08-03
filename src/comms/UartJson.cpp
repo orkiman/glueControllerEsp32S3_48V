@@ -68,6 +68,7 @@ static void handleSetConfig(JsonDocument& doc) {
     if (doc["debounce_ms"].is<uint32_t>())      s->debounce_ms         = doc["debounce_ms"];
     if (doc["pick_current_a"].is<float>())      s->pick_current_a      = doc["pick_current_a"];
     if (doc["hold_current_a"].is<float>())      s->hold_current_a      = doc["hold_current_a"];
+    if (doc["encoder_source"].is<uint8_t>())    s->encoder_source      = doc["encoder_source"];
 
     // Basic sanity
     if (s->pulses_per_mm   <= 0.0f) { evt::postError("set_config","bad_pulses_per_mm");  return; }
@@ -75,6 +76,7 @@ static void handleSetConfig(JsonDocument& doc) {
     if (s->hold_current_a  <= 0.0f) { evt::postError("set_config","bad_hold_current");   return; }
     if (s->hold_current_a  >= s->pick_current_a) {
         evt::postError("set_config","hold_ge_pick");                                    return; }
+    if (s->encoder_source  > 1) { evt::postError("set_config","bad_encoder_source");     return; }
 
     cfg::Config::publish();
     rt::onConfigApplied();

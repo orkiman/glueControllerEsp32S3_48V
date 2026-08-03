@@ -12,9 +12,10 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtWidgets import (QCheckBox, QFileDialog, QFormLayout, QGridLayout,
-                               QGroupBox, QHBoxLayout, QPlainTextEdit,
-                               QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout,
+                               QGridLayout, QGroupBox, QHBoxLayout,
+                               QPlainTextEdit, QPushButton, QVBoxLayout,
+                               QWidget)
 
 from app.state import AppState, RuntimeConfig
 from ui.widgets.numeric_field import NumericField
@@ -64,11 +65,22 @@ class ConfigureScreen(QWidget):
         self.btn_cal.clicked.connect(
             lambda: state.calibrate(self.f_paper.value()))
 
+        # Encoder source: both encoders (GPIO40 fast 5V / GPIO5 alt 24V) are
+        # always counted in hardware in parallel; this just selects which one
+        # drives position tracking -- no reflash/rewiring needed to switch.
+        self.cmb_encoder = QComboBox()
+        self.cmb_encoder.addItem("ראשי - 5V מהיר (GPIO40)", 0)
+        self.cmb_encoder.addItem("חלופי - 24V אופטו (GPIO5)", 1)
+        self.cmb_encoder.currentIndexChanged.connect(
+            lambda _i: state.push_config(
+                encoder_source=self.cmb_encoder.currentData()))
+
         cal_box = QGroupBox("קליברציית אנקודר")
         cal_form = QFormLayout(cal_box)
         cal_form.addRow(self.f_ppm)
         cal_form.addRow(self.f_paper)
         cal_form.addRow(self.btn_cal)
+        cal_form.addRow("מקור אנקודר", self.cmb_encoder)
 
         # ---- Event log -----------------------------------------------------
         self.log = QPlainTextEdit()
@@ -115,6 +127,11 @@ class ConfigureScreen(QWidget):
         self.f_min_spd .setValue(c.min_speed_mm_s)
         self.f_debounce.setValue(c.debounce_ms)
         self.f_ppm     .setValue(c.pulses_per_mm)
+        idx = self.cmb_encoder.findData(c.encoder_source)
+        if idx >= 0 and idx != self.cmb_encoder.currentIndex():
+            self.cmb_encoder.blockSignals(True)
+            self.cmb_encoder.setCurrentIndex(idx)
+            self.cmb_encoder.blockSignals(False)
 
     def _is_routine(self, ev: dict) -> bool:
         """High-frequency, low-signal traffic that clutters the log:

@@ -33,6 +33,10 @@ class RuntimeConfig:
     debounce_ms: int           = 20
     pick_current_a: float      = 1.0
     hold_current_a: float      = 0.4
+    # 0 = primary fast 5V encoder (GPIO40), 1 = alternate 24V opto encoder
+    # (GPIO5). Both are always counted in hardware; this only selects which
+    # one drives pattern position tracking.
+    encoder_source: int        = 0
 
 
 @dataclass
@@ -152,6 +156,7 @@ class AppState(QObject):
             debounce_ms=self.config.debounce_ms,
             pick_current_a=self.config.pick_current_a,
             hold_current_a=self.config.hold_current_a,
+            encoder_source=self.config.encoder_source,
         ))
         for i in range(proto.NUM_GUNS):
             self.push_pattern(i)

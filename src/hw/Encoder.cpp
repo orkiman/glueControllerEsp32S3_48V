@@ -14,30 +14,45 @@ namespace pattern {
 
 namespace encoder {
 
-static constexpr pcnt_unit_t PCNT_UNIT = PCNT_UNIT_0;
-static constexpr int16_t     PCNT_LIMIT = 30000;          // wrap window
+// Both encoders are counted in hardware in parallel, each on its own PCNT
+// unit -- there is no wiring/resource conflict.  cfg::RuntimeConfig::
+// encoder_source only selects which unit's count pulseCount() reports to the
+// pattern scheduler, so switching encoders is a pure config change (no
+// reflash, no rewiring).
+//   Source 0 (primary) -> PCNT_UNIT_0, pins::ENCODER      (fast 5V, GPIO40)
+//   Source 1 (alt)     -> PCNT_UNIT_1, pins::ENCODER_ALT  (24V opto, GPIO5)
+static constexpr pcnt_unit_t PCNT_UNIT_PRIMARY = PCNT_UNIT_0;
+static constexpr pcnt_unit_t PCNT_UNIT_ALT     = PCNT_UNIT_1;
+static constexpr int16_t     PCNT_LIMIT        = 30000;   // wrap window
 
-// 32-bit accumulator extending PCNT's 16-bit counter.
-static volatile uint32_t s_pulseAccum = 0;
-static volatile int16_t  s_lastSnap   = 0;
+// 32-bit accumulators extending each PCNT's 16-bit counter.  Indexed by
+// source (0 = primary, 1 = alt).
+static volatile uint32_t s_pulseAccum[2] = {0, 0};
 
 // Debounce state for photocell.
 static volatile int64_t s_lastEdgeUs = 0;
 
-static void IRAM_ATTR pcntOverflowIsr(void* /*arg*/) {
-    uint32_t status = 0;
-    pcnt_get_event_status(PCNT_UNIT, &status);
+static void IRAM_ATTR pcntOverflowIsr(void* arg) {
+    uint8_t     src  = (uint8_t)(uintptr_t)arg;
+    pcnt_unit_t unit = (src == 0) ? PCNT_UNIT_PRIMARY : PCNT_UNIT_ALT;
+    uint32_t    status = 0;
+    pcnt_get_event_status(unit, &status);
     if (status & PCNT_EVT_H_LIM) {
-        s_pulseAccum += (uint32_t)PCNT_LIMIT;
-        pcnt_counter_clear(PCNT_UNIT);
-        s_lastSnap = 0;
+        s_pulseAccum[src] += (uint32_t)PCNT_LIMIT;
+        pcnt_counter_clear(unit);
     }
 }
 
-uint32_t IRAM_ATTR pulseCount() {
+static inline uint32_t IRAM_ATTR readUnit(pcnt_unit_t unit, uint8_t src) {
     int16_t cnt = 0;
-    pcnt_get_counter_value(PCNT_UNIT, &cnt);
-    return s_pulseAccum + (uint32_t)(uint16_t)cnt;
+    pcnt_get_counter_value(unit, &cnt);
+    return s_pulseAccum[src] + (uint32_t)(uint16_t)cnt;
+}
+
+uint32_t IRAM_ATTR pulseCount() {
+    uint8_t src = cfg::Config::active()->encoder_source;
+    return (src == 0) ? readUnit(PCNT_UNIT_PRIMARY, 0)
+                       : readUnit(PCNT_UNIT_ALT,     1);
 }
 
 static void IRAM_ATTR photocellIsr(void* /*arg*/) {
@@ -52,9 +67,9 @@ static void IRAM_ATTR photocellIsr(void* /*arg*/) {
     else       pattern::onPhotocellFallingEdge(p);
 }
 
-static void initPcnt() {
+static void initPcnt(pcnt_unit_t unit, int8_t gpioPin, uint8_t srcIdx) {
     pcnt_config_t c = {};
-    c.pulse_gpio_num = pins::ENCODER;
+    c.pulse_gpio_num = gpioPin;
     c.ctrl_gpio_num  = PCNT_PIN_NOT_USED;
     c.lctrl_mode     = PCNT_MODE_KEEP;
     c.hctrl_mode     = PCNT_MODE_KEEP;
@@ -62,22 +77,21 @@ static void initPcnt() {
     c.neg_mode       = PCNT_COUNT_DIS;
     c.counter_h_lim  = PCNT_LIMIT;
     c.counter_l_lim  = -1;
-    c.unit           = PCNT_UNIT;
+    c.unit           = unit;
     c.channel        = PCNT_CHANNEL_0;
     pcnt_unit_config(&c);
 
     // ~80 MHz APB / 1023 ticks ~= 12.8 us min pulse width filter.  Plenty for
     // an industrial encoder; tightens if needed via cfg later.
-    pcnt_set_filter_value(PCNT_UNIT, 100);
-    pcnt_filter_enable(PCNT_UNIT);
+    pcnt_set_filter_value(unit, 100);
+    pcnt_filter_enable(unit);
 
-    pcnt_event_enable(PCNT_UNIT, PCNT_EVT_H_LIM);
-    pcnt_counter_pause(PCNT_UNIT);
-    pcnt_counter_clear(PCNT_UNIT);
+    pcnt_event_enable(unit, PCNT_EVT_H_LIM);
+    pcnt_counter_pause(unit);
+    pcnt_counter_clear(unit);
 
-    pcnt_isr_service_install(0);
-    pcnt_isr_handler_add(PCNT_UNIT, pcntOverflowIsr, nullptr);
-    pcnt_counter_resume(PCNT_UNIT);
+    pcnt_isr_handler_add(unit, pcntOverflowIsr, (void*)(uintptr_t)srcIdx);
+    pcnt_counter_resume(unit);
 }
 
 static void initPhotocell() {
@@ -96,7 +110,9 @@ static void initPhotocell() {
 }
 
 void init() {
-    initPcnt();
+    pcnt_isr_service_install(0);
+    initPcnt(PCNT_UNIT_PRIMARY, pins::ENCODER,     0);
+    initPcnt(PCNT_UNIT_ALT,     pins::ENCODER_ALT, 1);
     initPhotocell();
 }
 

@@ -51,6 +51,12 @@ struct RuntimeConfig {
     uint32_t debounce_ms          = 20;
     float    pick_current_a       = 1.0f;
     float    hold_current_a       = 0.4f;
+    // Which physical encoder feeds pattern position tracking.  Both PCNT
+    // units always count in parallel in hardware (no rewiring/reflash needed
+    // to switch); this only selects which count encoder::pulseCount() reports.
+    //   0 = primary: fast 5V encoder on GPIO40 (pins::ENCODER)
+    //   1 = alternate: 24V opto encoder on GPIO5 (pins::ENCODER_ALT)
+    uint8_t  encoder_source        = 0;
 
     // ---- per-gun pattern (includes per-gun on_timeout_ms / droplet size) ----
     GunPattern pattern[pins::NUM_GUNS];
