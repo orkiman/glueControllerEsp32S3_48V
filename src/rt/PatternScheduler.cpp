@@ -43,8 +43,19 @@ static std::atomic<uint32_t>   s_calibLeadPulse{0};
 
 // ---------------- speed estimation ----------------
 static std::atomic<float>     s_lastSpeedMmS{0.0f};
+static std::atomic<uint32_t>  s_maxLoopGapUs{0};
+static std::atomic<uint32_t>  s_maxEventLatePulses{0};
+static std::atomic<uint32_t>  s_patternEvents{0};
+static std::atomic<uint32_t>  s_sheetQueueOverflows{0};
+static_assert(std::atomic<uint32_t>::is_always_lock_free);
 
 // ---------------- helpers ----------------
+static inline void updateMax(std::atomic<uint32_t>& target, uint32_t value) {
+    uint32_t current = target.load(std::memory_order_relaxed);
+    while (value > current &&
+           !target.compare_exchange_weak(current, value, std::memory_order_relaxed)) {}
+}
+
 static inline float pulsesToMm(uint32_t p) {
     float ppm = s_pulsesPerMm.load(std::memory_order_acquire);
     return (ppm > 0.0f) ? ((float)p / ppm) : 0.0f;
@@ -132,7 +143,10 @@ void IRAM_ATTR onPhotocellEdge(uint32_t pulseAtEdge) {
     portENTER_CRITICAL_ISR(&s_mux);
     for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
         GunQueue& q = s_q[g];
-        if (q.size >= SHEET_QUEUE_DEPTH) continue;   // drop on overflow
+        if (q.size >= SHEET_QUEUE_DEPTH) {
+            s_sheetQueueOverflows.fetch_add(1, std::memory_order_relaxed);
+            continue;
+        }
         uint8_t slot = (q.head + q.size) % SHEET_QUEUE_DEPTH;
         q.ring[slot] = SheetGunInstance{ pulseAtEdge, 0, 0, false };
         q.size++;
@@ -166,12 +180,18 @@ void IRAM_ATTR onPhotocellFallingEdge(uint32_t pulseAtEdge) {
 static void patternTask(void*) {
     uint32_t lastPulse = 0;
     int64_t  lastUs    = esp_timer_get_time();
+    int64_t  lastLoopUs = lastUs;
+    bool     wasActive = false;
 
     for (;;) {
         uint32_t now = encoder::pulseCount();
 
         // --- speed estimate (mm/s) ---
         int64_t nowUs = esp_timer_get_time();
+        bool active = cfg::g_sys.active.load(std::memory_order_acquire);
+        if (active && wasActive) updateMax(s_maxLoopGapUs, (uint32_t)(nowUs - lastLoopUs));
+        lastLoopUs = nowUs;
+        wasActive = active;
         int64_t dtUs  = nowUs - lastUs;
         if (dtUs >= 10000) {
             uint32_t dp = now - lastPulse;
@@ -182,7 +202,7 @@ static void patternTask(void*) {
             lastUs    = nowUs;
         }
 
-        if (!cfg::g_sys.active.load(std::memory_order_acquire)) {
+        if (!active) {
             vTaskDelay(pdMS_TO_TICKS(5));
             continue;
         }
@@ -216,7 +236,10 @@ static void patternTask(void*) {
                     have = more;
                     continue;
                 }
-                if ((int32_t)(now - evPulse) < 0) break;   // not due yet
+                int32_t latePulses = (int32_t)(now - evPulse);
+                if (latePulses < 0) break;   // not due yet
+                updateMax(s_maxEventLatePulses, (uint32_t)latePulses);
+                s_patternEvents.fetch_add(1, std::memory_order_relaxed);
 
                 if (!tooSlow) {
                     if (action == 0) {                     // dot
@@ -260,6 +283,14 @@ void abortAll() {
 
 float currentPosMm()   { return pulsesToMm(encoder::pulseCount()); }
 float currentSpeedMmS(){ return s_lastSpeedMmS.load(std::memory_order_acquire); }
+Metrics metrics() {
+    return {
+        s_maxLoopGapUs.load(std::memory_order_relaxed),
+        s_maxEventLatePulses.load(std::memory_order_relaxed),
+        s_patternEvents.load(std::memory_order_relaxed),
+        s_sheetQueueOverflows.load(std::memory_order_relaxed),
+    };
+}
 
 void init() {
     onConfigApplied();

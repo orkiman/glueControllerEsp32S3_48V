@@ -39,7 +39,15 @@ void abortAll();
 void onConfigApplied();
 
 // Diagnostics for status events.
+struct Metrics {
+    uint32_t max_loop_gap_us;
+    uint32_t max_event_late_pulses;
+    uint32_t pattern_events;
+    uint32_t sheet_queue_overflows;
+};
+
 float currentPosMm();
 float currentSpeedMmS();
+Metrics metrics();
 
 } // namespace pattern

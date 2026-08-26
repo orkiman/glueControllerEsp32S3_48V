@@ -31,6 +31,7 @@ static volatile uint32_t s_pulseAccum[2] = {0, 0};
 
 // Debounce state for photocell.
 static volatile int64_t s_lastEdgeUs = 0;
+static bool s_pcntIsrInstalled = false;
 
 static void IRAM_ATTR pcntOverflowIsr(void* arg) {
     uint8_t     src  = (uint8_t)(uintptr_t)arg;
@@ -80,6 +81,10 @@ static void initPcnt(pcnt_unit_t unit, int8_t gpioPin, uint8_t srcIdx) {
     c.unit           = unit;
     c.channel        = PCNT_CHANNEL_0;
     pcnt_unit_config(&c);
+    if (!s_pcntIsrInstalled) {
+        esp_err_t err = pcnt_isr_service_install(ESP_INTR_FLAG_IRAM);
+        s_pcntIsrInstalled = err == ESP_OK || err == ESP_ERR_INVALID_STATE;
+    }
 
     // ~80 MHz APB / 1023 ticks ~= 12.8 us min pulse width filter.  Plenty for
     // an industrial encoder; tightens if needed via cfg later.
@@ -110,7 +115,6 @@ static void initPhotocell() {
 }
 
 void init() {
-    pcnt_isr_service_install(0);
     initPcnt(PCNT_UNIT_PRIMARY, pins::ENCODER,     0);
     initPcnt(PCNT_UNIT_ALT,     pins::ENCODER_ALT, 1);
     initPhotocell();

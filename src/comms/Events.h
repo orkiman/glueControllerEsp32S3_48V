@@ -31,6 +31,10 @@ struct Event {
     float   f1;           // CalibResult: pulses_per_mm ; Status: pos_mm
     float   f2;           // Status: speed_mm_s
     uint8_t b1;           // Status: active flag
+    uint32_t u1;
+    uint32_t u2;
+    uint32_t u3;
+    uint32_t u4;
 };
 
 void init();                                  // creates queue + spawns emitter
@@ -43,6 +47,8 @@ void postAck(const char* cmd);
 void postError(const char* cmd, const char* reason);
 void postCalibResult(float pulses_per_mm);
 void postWatchdogTimeout();
-void postStatus(float pos_mm, float speed_mm_s, bool active);
+void postStatus(float pos_mm, float speed_mm_s, bool active,
+                uint32_t maxLoopGapUs, uint32_t maxEventLatePulses,
+                uint32_t patternEvents, uint32_t sheetQueueOverflows);
 
 } // namespace evt

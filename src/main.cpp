@@ -3,6 +3,7 @@
 #include "config/Config.h"
 #include "comms/Events.h"
 #include "comms/UartJson.h"
+#include "storage/ProgramStore.h"
 #include "hw/Driver.h"
 #include "hw/Dac.h"
 #include "hw/Encoder.h"
@@ -12,6 +13,7 @@
 #include "sys/Fault.h"
 #include "sys/Watchdog.h"
 #include "sys/Status.h"
+#include "net/SoftAP.h"
 
 // =============================================================================
 // Cold Glue Controller - Main Controller firmware entry point.
@@ -35,6 +37,9 @@ void setup() {
     // ---- 2. Safe-state every output BEFORE anything else can fire ----
     drv::init();
 
+    // ---- 2a. Persistent program store: mount and restore last active snapshot ----
+    prog::init();
+
     // ---- 3. Comms backbone: Serial + event emitter + RX/JSON ----
     evt::init();
     uartjson::init();
@@ -49,9 +54,13 @@ void setup() {
     pattern::init();      // PatternTask (Core 1)
     testrun::init();      // diagnostic test runner
 
+    // Notify program store that RT caches can now be refreshed from config.
+    prog::onRuntimeInitialized();
+
     // ---- 6. Supervisors ----
     watchdog::init();
     status::init();
+    net::init();
 
     // ---- 7. Announce readiness to HMI ----
     evt::postReady();

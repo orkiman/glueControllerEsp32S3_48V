@@ -35,7 +35,6 @@ void init() {
     g.pull_down_en = GPIO_PULLDOWN_DISABLE;
     g.intr_type    = GPIO_INTR_NEGEDGE;       // active LOW
     gpio_config(&g);
-    gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
     gpio_isr_handler_add((gpio_num_t)pins::N_FAULT, faultIsr, nullptr);
 }
 

@@ -10,7 +10,7 @@ static QueueHandle_t s_queue = nullptr;
 static void emitterTask(void*) {
     Event e;
     JsonDocument doc;
-    char line[192];
+    char line[256];
 
     for (;;) {
         if (xQueueReceive(s_queue, &e, portMAX_DELAY) != pdTRUE) continue;
@@ -34,10 +34,14 @@ static void emitterTask(void*) {
                 doc["pulses_per_mm"] = e.f1;
                 break;
             case Kind::Status:
-                doc["event"]      = "status";
-                doc["pos_mm"]     = e.f1;
-                doc["speed_mm_s"] = e.f2;
-                doc["active"]     = e.b1 != 0;
+                doc["event"]                 = "status";
+                doc["pos_mm"]                = e.f1;
+                doc["speed_mm_s"]            = e.f2;
+                doc["active"]                = e.b1 != 0;
+                doc["max_loop_gap_us"]       = e.u1;
+                doc["max_event_late_pulses"] = e.u2;
+                doc["pattern_events"]        = e.u3;
+                doc["sheet_queue_overflows"] = e.u4;
                 break;
             case Kind::WatchdogTimeout:
                 doc["event"] = "watchdog_timeout";
@@ -96,9 +100,15 @@ void postCalibResult(float pulses_per_mm) {
 void postWatchdogTimeout() {
     Event e{}; e.kind = Kind::WatchdogTimeout; post(e);
 }
-void postStatus(float pos_mm, float speed_mm_s, bool active) {
+void postStatus(float pos_mm, float speed_mm_s, bool active,
+                uint32_t maxLoopGapUs, uint32_t maxEventLatePulses,
+                uint32_t patternEvents, uint32_t sheetQueueOverflows) {
     Event e{}; e.kind = Kind::Status;
     e.f1 = pos_mm; e.f2 = speed_mm_s; e.b1 = active ? 1 : 0;
+    e.u1 = maxLoopGapUs;
+    e.u2 = maxEventLatePulses;
+    e.u3 = patternEvents;
+    e.u4 = sheetQueueOverflows;
     post(e);
 }
 

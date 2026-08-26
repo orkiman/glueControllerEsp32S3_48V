@@ -140,9 +140,6 @@ static void initOnTimer(uint8_t g) {
 }
 
 void init() {
-    // GPIO ISR service was installed by encoder::init().  If not, install now.
-    gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
-
     for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
         initPeakPin(g);
         initOnTimer(g);
