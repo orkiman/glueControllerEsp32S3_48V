@@ -9,6 +9,15 @@ static QueueHandle_t s_queue = nullptr;
 static EventCallback s_cb = nullptr;
 static void* s_cbUser = nullptr;
 
+static prog::ProgramMeta s_plList[prog::MAX_PROGRAMS];
+static size_t            s_plCount = 0;
+static uint8_t           s_plActive = 0;
+
+// Staging for config/pattern snapshot events (filled by postConfig/postPattern).
+static cfg::RuntimeConfig s_evConfig;
+static uint8_t            s_evGun = 0;
+static cfg::GunPattern    s_evPattern;
+
 static inline void invokeCb(const Event& e) {
     if (s_cb) s_cb(e, s_cbUser);
 }
@@ -16,7 +25,7 @@ static inline void invokeCb(const Event& e) {
 static void emitterTask(void*) {
     Event e;
     JsonDocument doc;
-    char line[256];
+    char line[2048];
 
     for (;;) {
         if (xQueueReceive(s_queue, &e, portMAX_DELAY) != pdTRUE) continue;
@@ -57,6 +66,46 @@ static void emitterTask(void*) {
                 doc["tag"]   = e.cmd;      // "peak" / "nopeak"
                 doc["gun"]   = e.b1;       // 1-based gun
                 doc["us"]    = e.f1;       // microseconds since fire()
+                break;
+            case Kind::ProgramList:
+                doc["event"]     = "programs_list";
+                doc["active_id"] = s_plActive;
+                {
+                    JsonArray arr = doc["programs"].to<JsonArray>();
+                    for (size_t i = 0; i < s_plCount; ++i) {
+                        JsonObject o = arr.add<JsonObject>();
+                        o["id"]   = s_plList[i].id;
+                        o["name"] = s_plList[i].name;
+                    }
+                }
+                break;
+            case Kind::Config:
+                doc["event"]                = "config";
+                doc["pulses_per_mm"]        = s_evConfig.pulses_per_mm;
+                doc["min_speed_mm_s"]       = s_evConfig.min_speed_mm_s;
+                doc["photocell_offset_mm"]  = s_evConfig.photocell_offset_mm;
+                doc["debounce_ms"]          = s_evConfig.debounce_ms;
+                doc["pick_current_a"]       = s_evConfig.pick_current_a;
+                doc["hold_current_a"]       = s_evConfig.hold_current_a;
+                doc["encoder_source"]       = s_evConfig.encoder_source;
+                break;
+            case Kind::Pattern:
+                doc["event"]          = "pattern";
+                doc["gun"]            = s_evGun;
+                doc["type"]           = (s_evPattern.type == cfg::PatternType::Lines) ? "lines" :
+                                        (s_evPattern.type == cfg::PatternType::Dots)  ? "dots" : "none";
+                doc["on_timeout_ms"]  = s_evPattern.on_timeout_ms;
+                {
+                    JsonArray arr = doc["elements"].to<JsonArray>();
+                    for (uint8_t i = 0; i < s_evPattern.count; ++i) {
+                        JsonObject o = arr.add<JsonObject>();
+                        o["start"] = s_evPattern.elems[i].start_mm;
+                        o["end"]   = s_evPattern.elems[i].end_mm;
+                        if (s_evPattern.type == cfg::PatternType::Dots) {
+                            o["spacing"] = s_evPattern.elems[i].spacing_mm;
+                        }
+                    }
+                }
                 break;
         }
         size_t n = serializeJson(doc, line, sizeof(line) - 2);
@@ -111,6 +160,22 @@ void postError(const char* cmd, const char* reason) {
 }
 void postCalibResult(float pulses_per_mm) {
     Event e{}; e.kind = Kind::CalibResult; e.f1 = pulses_per_mm; post(e);
+}
+void postProgramsList(const prog::ProgramMeta* list, size_t count, uint8_t activeId) {
+    size_t n = (count > prog::MAX_PROGRAMS) ? prog::MAX_PROGRAMS : count;
+    for (size_t i = 0; i < n; ++i) s_plList[i] = list[i];
+    s_plCount = n;
+    s_plActive = activeId;
+    Event e{}; e.kind = Kind::ProgramList; post(e);
+}
+void postConfig(const cfg::RuntimeConfig* config) {
+    s_evConfig = *config;
+    Event e{}; e.kind = Kind::Config; post(e);
+}
+void postPattern(uint8_t gun_1based, const cfg::GunPattern* pattern) {
+    s_evGun = gun_1based;
+    s_evPattern = *pattern;
+    Event e{}; e.kind = Kind::Pattern; post(e);
 }
 void postWatchdogTimeout() {
     Event e{}; e.kind = Kind::WatchdogTimeout; post(e);

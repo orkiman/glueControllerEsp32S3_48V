@@ -2,6 +2,7 @@
 #include "config/Config.h"
 #include "rt/Control.h"
 #include "storage/ProgramStore.h"
+#include "comms/Events.h"
 #include "hw/Pins.h"
 
 #include <Arduino.h>
@@ -138,6 +139,65 @@ static Result handleCalibArm(JsonDocument& doc) {
     return makeResult(true, "calib_arm");
 }
 
+static void emitProgramsList() {
+    prog::ProgramMeta list[prog::MAX_PROGRAMS];
+    size_t count = 0;
+    if (prog::list(list, prog::MAX_PROGRAMS, count)) {
+        evt::postProgramsList(list, count, prog::activeId());
+    }
+}
+
+static Result handleListPrograms(JsonDocument&) {
+    emitProgramsList();
+    return makeResult(true, "list_programs");
+}
+
+static Result handleSaveProgram(JsonDocument& doc) {
+    uint8_t id = doc["id"] | 0;
+    const char* name = doc["name"] | "";
+    if (!name[0]) { return makeResult(false, "save_program", "missing_name"); }
+    uint8_t outId = 0;
+    if (!prog::save(id, name, &outId)) {
+        return makeResult(false, "save_program", "save_failed");
+    }
+    emitProgramsList();
+    return makeResult(true, "save_program");
+}
+
+static Result handleLoadProgram(JsonDocument& doc) {
+    uint8_t id = doc["id"] | 0;
+    if (id == 0 || !prog::load(id)) {
+        return makeResult(false, "load_program", "load_failed");
+    }
+    const cfg::RuntimeConfig* c = cfg::Config::active();
+    evt::postConfig(c);
+    for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
+        evt::postPattern(g + 1, &c->pattern[g]);
+    }
+    emitProgramsList();
+    return makeResult(true, "load_program");
+}
+
+static Result handleRenameProgram(JsonDocument& doc) {
+    uint8_t id = doc["id"] | 0;
+    const char* name = doc["name"] | "";
+    if (!name[0]) { return makeResult(false, "rename_program", "missing_name"); }
+    if (!prog::rename(id, name)) {
+        return makeResult(false, "rename_program", "rename_failed");
+    }
+    emitProgramsList();
+    return makeResult(true, "rename_program");
+}
+
+static Result handleDeleteProgram(JsonDocument& doc) {
+    uint8_t id = doc["id"] | 0;
+    if (id == 0 || !prog::erase(id)) {
+        return makeResult(false, "delete_program", "delete_failed");
+    }
+    emitProgramsList();
+    return makeResult(true, "delete_program");
+}
+
 static Result handleTestOpen(JsonDocument& doc) {
     if (!doc["gun"].is<uint8_t>()) { return makeResult(false, "test_open","missing_gun"); }
     uint8_t  gun     = doc["gun"].as<uint8_t>();
@@ -176,15 +236,20 @@ Result dispatch(const char* line, size_t len) {
     const char* command = doc["cmd"] | "";
     feedWatchdog();
 
-    if      (!strcmp(command, "set_active"))  return handleSetActive(doc);
-    else if (!strcmp(command, "set_config"))  return handleSetConfig(doc);
-    else if (!strcmp(command, "set_pattern")) return handleSetPattern(doc);
-    else if (!strcmp(command, "calib_arm"))   return handleCalibArm(doc);
-    else if (!strcmp(command, "test_open"))   return handleTestOpen(doc);
-    else if (!strcmp(command, "test_close"))  return handleTestClose(doc);
-    else if (!strcmp(command, "ping"))        return handlePing(doc);
-    else if (!strcmp(command, "sw_trigger"))  return handleSwTrigger(doc);
-    else                                      return makeResult(false, command, "unknown_cmd");
+    if      (!strcmp(command, "set_active"))      return handleSetActive(doc);
+    else if (!strcmp(command, "set_config"))      return handleSetConfig(doc);
+    else if (!strcmp(command, "set_pattern"))     return handleSetPattern(doc);
+    else if (!strcmp(command, "calib_arm"))       return handleCalibArm(doc);
+    else if (!strcmp(command, "test_open"))       return handleTestOpen(doc);
+    else if (!strcmp(command, "test_close"))     return handleTestClose(doc);
+    else if (!strcmp(command, "ping"))            return handlePing(doc);
+    else if (!strcmp(command, "sw_trigger"))     return handleSwTrigger(doc);
+    else if (!strcmp(command, "list_programs"))  return handleListPrograms(doc);
+    else if (!strcmp(command, "save_program"))   return handleSaveProgram(doc);
+    else if (!strcmp(command, "load_program"))   return handleLoadProgram(doc);
+    else if (!strcmp(command, "rename_program"))  return handleRenameProgram(doc);
+    else if (!strcmp(command, "delete_program"))  return handleDeleteProgram(doc);
+    else                                          return makeResult(false, command, "unknown_cmd");
 }
 
 } // namespace cmd

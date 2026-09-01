@@ -2,6 +2,8 @@
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
+#include "config/Config.h"
+#include "storage/ProgramStore.h"
 
 // =============================================================================
 // Cross-core event pipe: Core 1 (ISRs / RT tasks) -> Core 0 (UART emitter).
@@ -21,6 +23,9 @@ enum class Kind : uint8_t {
     Status,              // {"event":"status",...}
     WatchdogTimeout,     // {"event":"watchdog_timeout"}
     Debug,               // {"event":"debug","tag":"..","gun":N,"us":X}
+    ProgramList,         // {"event":"programs_list","programs":[...],"active_id":N}
+    Config,              // {"event":"config",...}
+    Pattern,             // {"event":"pattern",...}
 };
 
 // Short fixed-width string fields keep the queue element trivially copyable.
@@ -50,6 +55,9 @@ void postReady();
 void postAck(const char* cmd);
 void postError(const char* cmd, const char* reason);
 void postCalibResult(float pulses_per_mm);
+void postProgramsList(const prog::ProgramMeta* list, size_t count, uint8_t activeId);
+void postConfig(const cfg::RuntimeConfig* config);
+void postPattern(uint8_t gun_1based, const cfg::GunPattern* pattern);
 void postWatchdogTimeout();
 void postStatus(float pos_mm, float speed_mm_s, bool active,
                 uint32_t maxLoopGapUs, uint32_t maxEventLatePulses,

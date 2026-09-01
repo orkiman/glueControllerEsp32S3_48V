@@ -68,15 +68,20 @@ class GunToolbar(QGroupBox):
         state.connection_changed.connect(self._update_test_enabled)
         state.status_changed.connect(self._update_test_enabled)
 
-        row1 = QHBoxLayout()
-        row1.addWidget(QLabel("סוג:"))
-        row1.addWidget(self.type_combo, 1)
-        row1.addWidget(btn_add)
-        row1.addWidget(btn_clr)
-        row1.addWidget(btn_test)
+        type_row = QHBoxLayout()
+        type_row.addWidget(QLabel("סוג:"))
+        type_row.addWidget(self.type_combo, 1)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(6)
+        btn_row.addWidget(btn_add)
+        btn_row.addWidget(btn_clr)
+        btn_row.addWidget(btn_test)
 
         outer = QVBoxLayout(self)
-        outer.addLayout(row1)
+        outer.setSpacing(8)
+        outer.addLayout(type_row)
+        outer.addLayout(btn_row)
         outer.addWidget(self.f_droplet)
 
     def set_type_from_state(self, ptype: proto.PatternType) -> None:

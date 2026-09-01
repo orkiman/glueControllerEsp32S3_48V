@@ -1,31 +1,27 @@
 """Program selector / manager bar.
 
-Lets the operator pick a saved program from a dropdown, save the current
-one (overwrite or save-as), create a new empty one, or delete one. The
-current program is auto-saved (debounced) on every edit so the last program
-is always restored on the next launch.
+The controller's SPIFFS program store is the single source of truth.  This bar
+lists programs from the controller, lets the operator switch to one, and
+save/rename/delete/create programs via serial commands.
 """
 from __future__ import annotations
 
 from typing import Callable
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QComboBox, QHBoxLayout, QInputDialog, QLabel,
                                QMessageBox, QPushButton, QWidget)
 
 from app import protocol as proto
-from app.programs import DEFAULT_NAME, ProgramStore
 from app.state import AppState
 
 
 class ProgramBar(QWidget):
-    def __init__(self, state: AppState, store: ProgramStore,
-                 refresh_cb: Callable[[], None]) -> None:
+    def __init__(self, state: AppState, refresh_cb: Callable[[], None]) -> None:
         super().__init__()
-        self.state   = state
-        self.store   = store
+        self.state = state
         self._refresh = refresh_cb
-        self._loading = False   # guards programmatic state changes
+        self._loading = False
 
         self.combo = QComboBox()
         self.combo.setMinimumWidth(220)
@@ -50,116 +46,86 @@ class ProgramBar(QWidget):
         lay.addStretch(1)
         lay.addWidget(btn_del)
 
-        # Debounced auto-save so the active program always persists.
-        self._autosave = QTimer(self)
-        self._autosave.setInterval(600)
-        self._autosave.setSingleShot(True)
-        self._autosave.timeout.connect(self._do_autosave)
-        state.pattern_changed.connect(lambda *_: self._schedule_autosave())
-        state.config_changed.connect(lambda *_: self._schedule_autosave())
+        state.programs_changed.connect(self._on_programs_changed)
 
-        self._init_programs()
+    # ---- combo helpers -------------------------------------------------------
+    def _id_for_name(self, name: str) -> int:
+        for p in self.state.programs:
+            if p.get("name") == name:
+                return int(p.get("id", 0))
+        return 0
 
-    # ---- startup -----------------------------------------------------------
-    def _init_programs(self) -> None:
-        """Restore the last program, or seed a default empty one."""
+    def _on_programs_changed(self, programs: list) -> None:
         self._loading = True
-        names = self.store.names()
-        if not names:
-            self.store.save_program(DEFAULT_NAME, self.state)
-            names = self.store.names()
-        target = self.store.last or names[0]
-        self.store.apply(target, self.state)
-        self._reload_combo(select=target)
-        self._loading = False
-        self._refresh()
-
-    # ---- combo helpers -----------------------------------------------------
-    def _reload_combo(self, select: str | None = None) -> None:
+        current_id = self._current_id()
         self.combo.blockSignals(True)
         self.combo.clear()
-        self.combo.addItems(self.store.names())
-        if select is not None:
-            idx = self.combo.findText(select)
-            if idx >= 0:
-                self.combo.setCurrentIndex(idx)
+        for p in programs:
+            name = p.get("name", "")
+            pid = p.get("id", 0)
+            self.combo.addItem(name, pid)
+        # Prefer the controller's active program; fall back to current selection.
+        select_id = self.state.active_program_id or current_id
+        for i in range(self.combo.count()):
+            if self.combo.itemData(i) == select_id:
+                self.combo.setCurrentIndex(i)
+                break
         self.combo.blockSignals(False)
+        self._loading = False
 
-    def current_name(self) -> str:
-        return self.combo.currentText() or DEFAULT_NAME
+    def _current_id(self) -> int:
+        return int(self.combo.currentData() or 0)
 
-    # ---- handlers ----------------------------------------------------------
+    # ---- handlers ------------------------------------------------------------
     def _on_combo_changed(self, _idx: int) -> None:
         if self._loading:
             return
-        name = self.combo.currentText()
-        if not name:
-            return
-        self._loading = True
-        self.store.apply(name, self.state)
-        self._loading = False
-        self._refresh()
+        pid = self._current_id()
+        if pid:
+            self.state.load_program(pid)
 
     def _on_save(self) -> None:
-        self.store.save_program(self.current_name(), self.state)
+        pid = self._current_id()
+        name = self.combo.currentText()
+        if not pid or not name:
+            return
+        self.state.save_program(pid, name)
 
     def _on_save_as(self) -> None:
         name, ok = QInputDialog.getText(self, "שמירה בשם", "שם התוכנית:")
         name = name.strip()
         if not ok or not name:
             return
-        if self.store.exists(name) and QMessageBox.question(
+        pid = self._id_for_name(name)
+        if pid and QMessageBox.question(
                 self, "קיים", f"'{name}' קיימת. להחליף?") != \
                 QMessageBox.StandardButton.Yes:
             return
-        self.store.save_program(name, self.state)
-        self._reload_combo(select=name)
+        self.state.save_program(pid, name)
 
     def _on_new(self) -> None:
         name, ok = QInputDialog.getText(self, "תוכנית חדשה", "שם התוכנית:")
         name = name.strip()
         if not ok or not name:
             return
-        if self.store.exists(name):
+        if self._id_for_name(name):
             QMessageBox.warning(self, "קיים", f"'{name}' כבר קיימת.")
             return
-        # Empty pattern set on all guns (config is kept as-is).
-        self._loading = True
+        # Clear patterns locally and push them to the controller before saving.
         for i in range(proto.NUM_GUNS):
             gp = self.state.patterns[i]
             gp.type = proto.PatternType.NONE
             gp.elements = []
             gp.on_timeout_ms = 1.2
-            self.state.pattern_changed.emit(i, gp)
-        self.store.save_program(name, self.state)
-        self._reload_combo(select=name)
-        self._loading = False
-        self._refresh()
+            self.state.push_pattern(i)
+        self.state.save_program(0, name)
 
     def _on_delete(self) -> None:
+        pid = self._current_id()
         name = self.combo.currentText()
-        if not name:
+        if not pid:
             return
         if QMessageBox.question(self, "מחיקה", f"למחוק את '{name}'?") != \
                 QMessageBox.StandardButton.Yes:
             return
-        self.store.delete(name)
-        names = self.store.names()
-        self._loading = True
-        if not names:
-            self.store.save_program(DEFAULT_NAME, self.state)
-            names = self.store.names()
-        nxt = names[0]
-        self.store.apply(nxt, self.state)
-        self._reload_combo(select=nxt)
-        self._loading = False
-        self._refresh()
-
-    # ---- auto-save ---------------------------------------------------------
-    def _schedule_autosave(self) -> None:
-        if self._loading:
-            return
-        self._autosave.start()
-
-    def _do_autosave(self) -> None:
-        self.store.save_program(self.current_name(), self.state)
+        self.state.delete_program(pid)

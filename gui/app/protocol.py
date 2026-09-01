@@ -101,6 +101,30 @@ def cmd_sw_trigger() -> dict[str, Any]:
 
 
 # -----------------------------------------------------------------------------
+# Program-store commands (serial mirror of the web program endpoints).
+# -----------------------------------------------------------------------------
+
+def cmd_list_programs() -> dict[str, Any]:
+    return {"cmd": "list_programs"}
+
+
+def cmd_save_program(id: int, name: str) -> dict[str, Any]:
+    return {"cmd": "save_program", "id": int(id), "name": str(name)}
+
+
+def cmd_load_program(id: int) -> dict[str, Any]:
+    return {"cmd": "load_program", "id": int(id)}
+
+
+def cmd_rename_program(id: int, name: str) -> dict[str, Any]:
+    return {"cmd": "rename_program", "id": int(id), "name": str(name)}
+
+
+def cmd_delete_program(id: int) -> dict[str, Any]:
+    return {"cmd": "delete_program", "id": int(id)}
+
+
+# -----------------------------------------------------------------------------
 # Event names (received from firmware).
 # -----------------------------------------------------------------------------
 
@@ -111,3 +135,4 @@ EVT_ERROR            = "error"
 EVT_PATTERN_EVENT    = "pattern_event"
 EVT_WATCHDOG_TIMEOUT = "watchdog_timeout"
 EVT_CALIB_RESULT     = "calib_result"
+EVT_PROGRAMS_LIST    = "programs_list"

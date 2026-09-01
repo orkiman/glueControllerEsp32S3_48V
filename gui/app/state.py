@@ -57,6 +57,7 @@ class AppState(QObject):
     command_sent       = Signal(dict)      # outbound command payload
     connection_changed = Signal(bool, str)
     error_received     = Signal(str, str)  # (cmd, reason)
+    programs_changed   = Signal(list)      # list of {id, name}
 
     def __init__(self, link: LinkBase) -> None:
         super().__init__()
@@ -64,6 +65,8 @@ class AppState(QObject):
         self.config   = RuntimeConfig()
         self.patterns = [GunPattern() for _ in range(proto.NUM_GUNS)]
         self.status   = LiveStatus()
+        self.programs: list[dict[str, Any]] = []   # controller program index
+        self.active_program_id: int = 0
 
         link.event_received.connect(self._on_event)
         link.connection_changed.connect(self._on_link_conn)
@@ -115,6 +118,22 @@ class AppState(QObject):
     def sw_trigger(self) -> None:
         self._send(proto.cmd_sw_trigger())
 
+    # ---- program store (controller is the source of truth) --------------------
+    def request_programs(self) -> None:
+        self._send(proto.cmd_list_programs())
+
+    def load_program(self, program_id: int) -> None:
+        self._send(proto.cmd_load_program(program_id))
+
+    def save_program(self, program_id: int, name: str) -> None:
+        self._send(proto.cmd_save_program(program_id, name))
+
+    def rename_program(self, program_id: int, name: str) -> None:
+        self._send(proto.cmd_rename_program(program_id, name))
+
+    def delete_program(self, program_id: int) -> None:
+        self._send(proto.cmd_delete_program(program_id))
+
     def reset_sheet_count(self) -> None:
         self.status.sheet_count = 0
         self.status_changed.emit(self.status)
@@ -127,6 +146,7 @@ class AppState(QObject):
             # Firmware (re)booted; its RAM config is back to defaults. Resync
             # so a reboot mid-session does not silently drop our patterns.
             self.push_full_state()
+            self.request_programs()
         elif kind == proto.EVT_STATUS:
             s = self.status
             s.active      = bool(ev.get("active", s.active))
@@ -142,6 +162,48 @@ class AppState(QObject):
             if isinstance(ppm, (int, float)):
                 self.config.pulses_per_mm = float(ppm)
                 self.config_changed.emit(self.config)
+        elif kind == proto.EVT_PROGRAMS_LIST:
+            self.programs = ev.get("programs", [])
+            self.active_program_id = ev.get("active_id", 0)
+            self.programs_changed.emit(self.programs)
+        elif kind == "config":
+            self._apply_config_event(ev)
+        elif kind == "pattern":
+            self._apply_pattern_event(ev)
+
+    def _apply_config_event(self, ev: dict[str, Any]) -> None:
+        try:
+            self.config.pulses_per_mm       = float(ev["pulses_per_mm"])
+            self.config.min_speed_mm_s      = float(ev["min_speed_mm_s"])
+            self.config.photocell_offset_mm = float(ev["photocell_offset_mm"])
+            self.config.debounce_ms         = int(ev["debounce_ms"])
+            self.config.pick_current_a      = float(ev["pick_current_a"])
+            self.config.hold_current_a        = float(ev["hold_current_a"])
+            self.config.encoder_source      = int(ev["encoder_source"])
+            self.config_changed.emit(self.config)
+        except (KeyError, ValueError, TypeError):
+            pass
+
+    def _apply_pattern_event(self, ev: dict[str, Any]) -> None:
+        try:
+            gun = int(ev["gun"]) - 1
+            if not 0 <= gun < proto.NUM_GUNS:
+                return
+            t = ev.get("type", "none")
+            gp = self.patterns[gun]
+            gp.type = proto.PatternType(t) if isinstance(t, proto.PatternType) else proto.PatternType(t)
+            gp.on_timeout_ms = float(ev.get("on_timeout_ms", 1.2))
+            gp.elements = [
+                proto.PatternElement(
+                    float(el["start"]),
+                    float(el["end"]),
+                    float(el["spacing"]) if "spacing" in el else 0.0,
+                )
+                for el in ev.get("elements", [])
+            ]
+            self.pattern_changed.emit(gun, gp)
+        except (KeyError, ValueError, TypeError):
+            pass
 
     def push_full_state(self) -> None:
         """Re-send config + every gun pattern + active flag to the firmware.
@@ -168,6 +230,7 @@ class AppState(QObject):
             # The program auto-loads from disk before the link is ready, so
             # push the current state now that we have a live connection.
             self.push_full_state()
+            self.request_programs()
 
     def _ping(self) -> None:
         if self.link.connected:

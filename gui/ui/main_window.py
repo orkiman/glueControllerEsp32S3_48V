@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (QFileDialog, QHBoxLayout, QListWidget,
                                QWidget)
 
 from app import profiles
-from app.programs import ProgramStore
 from app.state import AppState
 from ui.screens.configure import ConfigureScreen
 from ui.screens.operate import OperateScreen
@@ -47,10 +46,8 @@ class MainWindow(QMainWindow):
         body.addWidget(self.nav)
         body.addWidget(self.stack, 1)
 
-        # ---- program store + selector bar (restores last program) ----
-        self.store = ProgramStore()
-        self.program_bar = ProgramBar(state, self.store,
-                                      self._refresh_from_state)
+        # ---- program selector bar (controller-backed) ----
+        self.program_bar = ProgramBar(state, self._refresh_from_state)
 
         # ---- top connection bar + program bar + body ----
         root = QWidget()
