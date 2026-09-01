@@ -182,7 +182,7 @@ bool IRAM_ATTR fire(uint8_t g, uint32_t onMs) {
         ? (uint64_t)(cfg::Config::active()->pattern[g].on_timeout_ms * 1000.0f)
         : (uint64_t)onMs * 1000ull;
     if (onUs < 50)        onUs = 50;          // 50 us minimum sanity
-    if (onUs > 5'000'000) onUs = 5'000'000;   // 5 s hard ceiling
+    if (onUs > 10'000'000) onUs = 10'000'000;   // 10 s hard ceiling
 
     // Diagnostics: stamp the start and clear the peak-seen flag so onTimerCb
     // can tell whether the LM339 ever signalled peak for this gun.

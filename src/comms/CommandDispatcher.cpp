@@ -143,7 +143,7 @@ static Result handleTestOpen(JsonDocument& doc) {
     uint8_t  gun     = doc["gun"].as<uint8_t>();
     uint32_t timeout = doc["timeout_ms"] | 1000u;
     if (gun > pins::NUM_GUNS)        { return makeResult(false, "test_open","invalid_gun"); }
-    if (timeout == 0 || timeout > 5000u) {
+    if (timeout == 0 || timeout > 10000u) {
         return makeResult(false, "test_open","bad_timeout");
     }
     if (cfg::g_sys.fault.load())     { return makeResult(false, "test_open","hardware_fault"); }

@@ -84,7 +84,7 @@ static bool startOne(uint8_t g, uint32_t timeout_ms) {
 
     if (pt == cfg::PatternType::Lines) {
         // Single open-for-timeout line.  seq::fire's hold cap is enforced
-        // inside the sequencer (5 s); UartJson already validated timeout<=5000.
+        // inside the sequencer (10 s); command validation enforces timeout<=10000.
         if (!seq::fire(g, timeout_ms)) return false;
         s_t[g].mode.store(Mode::Line, std::memory_order_release);
         // Deadline timer not strictly needed (hold timer already drives Phase 3
