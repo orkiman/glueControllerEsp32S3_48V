@@ -25,7 +25,8 @@ static inline void invokeCb(const Event& e) {
 static void emitterTask(void*) {
     Event e;
     JsonDocument doc;
-    char line[2048];
+    // Static, large buffer so a full 64-element pattern fits without truncation.
+    static char line[8192];
 
     for (;;) {
         if (xQueueReceive(s_queue, &e, portMAX_DELAY) != pdTRUE) continue;

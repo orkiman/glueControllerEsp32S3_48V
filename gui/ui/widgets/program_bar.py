@@ -12,8 +12,12 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QComboBox, QHBoxLayout, QInputDialog, QLabel,
                                QMessageBox, QPushButton, QWidget)
 
+import logging
 from app import protocol as proto
 from app.state import AppState
+
+
+LOGGER = logging.getLogger("program_bar")
 
 
 class ProgramBar(QWidget):
@@ -56,6 +60,7 @@ class ProgramBar(QWidget):
         return 0
 
     def _on_programs_changed(self, programs: list) -> None:
+        LOGGER.info("programs_changed: %s", programs)
         self._loading = True
         current_id = self._current_id()
         self.combo.blockSignals(True)
@@ -81,6 +86,7 @@ class ProgramBar(QWidget):
         if self._loading:
             return
         pid = self._current_id()
+        LOGGER.info("combo changed -> load_program id=%s", pid)
         if pid:
             self.state.load_program(pid)
 
@@ -112,6 +118,7 @@ class ProgramBar(QWidget):
             QMessageBox.warning(self, "קיים", f"'{name}' כבר קיימת.")
             return
         # Clear patterns locally and push them to the controller before saving.
+        LOGGER.info("creating new program '%s'", name)
         for i in range(proto.NUM_GUNS):
             gp = self.state.patterns[i]
             gp.type = proto.PatternType.NONE

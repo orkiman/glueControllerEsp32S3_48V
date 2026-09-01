@@ -6,6 +6,7 @@ which write to the link. Live publish — no Apply button. UI changes call
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -13,6 +14,9 @@ from PySide6.QtCore import QObject, QTimer, Signal
 
 from . import protocol as proto
 from .link_base import LinkBase
+
+
+LOGGER = logging.getLogger("state")
 
 
 @dataclass
@@ -82,6 +86,7 @@ class AppState(QObject):
         """Single funnel for outbound traffic so we can surface every command
         in the event log (the 1 Hz ping keep-alive is deliberately silent)."""
         if payload.get("cmd") != "ping":
+            LOGGER.info("send: %s", payload)
             self.command_sent.emit(payload)
         self.link.send(payload)
 
@@ -140,6 +145,7 @@ class AppState(QObject):
 
     # ---- inbound (firmware -> UI) ------------------------------------------
     def _on_event(self, ev: dict[str, Any]) -> None:
+        LOGGER.info("event: %s", ev)
         self.log_appended.emit(ev)
         kind = ev.get("event", "")
         if kind == proto.EVT_READY:

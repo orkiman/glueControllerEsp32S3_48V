@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+import logging
+import os
 import sys
 
 from PySide6.QtCore import Qt
@@ -16,6 +18,15 @@ from ui.theme import apply_dark_theme
 
 
 def main() -> int:
+    log_path = os.path.join(os.path.dirname(__file__), "debug.log")
+    logging.basicConfig(
+        filename=log_path,
+        level=logging.DEBUG,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        encoding="utf-8",
+        force=True,
+    )
+
     parser = argparse.ArgumentParser(description="Cold Glue Controller GUI")
     parser.add_argument("--mock", action="store_true",
                         help="Run with an in-process fake firmware (no serial).")
