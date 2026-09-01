@@ -176,6 +176,7 @@ class PatternsScreen(QWidget):
         # Live publish wiring (editor -> firmware via state).
         self.editor.pattern_committed.connect(self._on_pattern_committed)
         state.config_changed.connect(self._on_config)
+        state.pattern_changed.connect(self._on_pattern_changed)
         # Initial sync.
         for i in range(proto.NUM_GUNS):
             self.toolbars[i].set_type_from_state(state.patterns[i].type)
@@ -183,6 +184,11 @@ class PatternsScreen(QWidget):
                 state.patterns[i].on_timeout_ms)
             self.editor.load_pattern(i, state.patterns[i].type,
                                      state.patterns[i].elements)
+
+    def _on_pattern_changed(self, gun_idx: int, gp: GunPattern) -> None:
+        self.editor.load_pattern(gun_idx, gp.type, gp.elements)
+        self.toolbars[gun_idx].set_type_from_state(gp.type)
+        self.toolbars[gun_idx].set_droplet_from_state(gp.on_timeout_ms)
 
     def _on_pattern_committed(self, gun_idx: int) -> None:
         ptype, elems = self.editor.export_pattern(gun_idx)

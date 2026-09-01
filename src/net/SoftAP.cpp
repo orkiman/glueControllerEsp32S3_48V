@@ -159,6 +159,14 @@ static void sendPrograms() {
     s_server.send(200, "application/json", body);
 }
 
+static void notifySerialPrograms() {
+    prog::ProgramMeta programs[prog::MAX_PROGRAMS];
+    size_t count = 0;
+    if (prog::list(programs, prog::MAX_PROGRAMS, count)) {
+        evt::postProgramsList(programs, count, prog::activeId());
+    }
+}
+
 static void handleProgramSave() {
     if (!canManagePrograms()) return;
     JsonDocument doc;
@@ -179,6 +187,7 @@ static void handleProgramSave() {
         sendResult(409, false, "program_save", "save_failed");
         return;
     }
+    notifySerialPrograms();
     JsonDocument response;
     response["ok"] = true;
     response["id"] = savedId;
@@ -196,6 +205,14 @@ static void handleProgramLoad() {
         return;
     }
     bool ok = prog::load(doc["id"].as<uint8_t>());
+    if (ok) {
+        const cfg::RuntimeConfig* c = cfg::Config::active();
+        evt::postConfig(c);
+        for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
+            evt::postPattern(g + 1, &c->pattern[g]);
+        }
+        notifySerialPrograms();
+    }
     sendResult(ok ? 200 : 404, ok, "program_load", ok ? "" : "load_failed");
 }
 
@@ -213,6 +230,7 @@ static void handleProgramRename() {
         return;
     }
     bool ok = prog::rename(doc["id"].as<uint8_t>(), name);
+    if (ok) notifySerialPrograms();
     sendResult(ok ? 200 : 404, ok, "program_rename", ok ? "" : "rename_failed");
 }
 
@@ -224,6 +242,7 @@ static void handleProgramDelete() {
         return;
     }
     bool ok = prog::erase(doc["id"].as<uint8_t>());
+    if (ok) notifySerialPrograms();
     sendResult(ok ? 200 : 404, ok, "program_delete", ok ? "" : "delete_failed");
 }
 
