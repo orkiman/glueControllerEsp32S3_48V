@@ -5,6 +5,7 @@
 #include "comms/Events.h"
 #include "config/Config.h"
 #include "hw/Pins.h"
+#include "rt/Control.h"
 #include "rt/PatternScheduler.h"
 #include "storage/ProgramStore.h"
 
@@ -13,12 +14,34 @@
 #include <DNSServer.h>
 #include <WebServer.h>
 #include <WiFi.h>
+#include <cstring>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 namespace net {
 
 static DNSServer s_dns;
 static WebServer s_server(80);
 static char s_ssid[24];
+
+static volatile uint32_t s_calibBits = 0;
+static volatile bool     s_calibReady = false;
+static TaskHandle_t      s_netTask = nullptr;
+
+static void IRAM_ATTR onNetEvent(const evt::Event& e, void*) {
+    if (e.kind != evt::Kind::CalibResult) return;
+    uint32_t bits;
+    memcpy(&bits, &e.f1, sizeof(bits));   // bit-copy float, no FPU in ISR
+    s_calibBits = bits;
+    s_calibReady = true;
+    if (!s_netTask) return;
+    if (xPortInIsrContext()) {
+        BaseType_t hp = pdFALSE;
+        vTaskNotifyGiveFromISR(s_netTask, &hp);
+    } else {
+        xTaskNotifyGive(s_netTask);
+    }
+}
 
 static void sendIndex() {
     s_server.sendHeader("Cache-Control", "no-store");
@@ -218,6 +241,51 @@ static void handleCommand() {
     sendResult(result.ok ? 200 : 400, result.ok, result.cmd, result.reason);
 }
 
+static void handleCalib() {
+    if (!control::canUse(control::Owner::Web)) {
+        sendResult(423, false, "calib", "control_busy");
+        return;
+    }
+    String body = s_server.arg("plain");
+    JsonDocument doc;
+    if (deserializeJson(doc, body) || !doc["paper_length_mm"].is<float>()) {
+        sendResult(400, false, "calib", "bad_request");
+        return;
+    }
+    float L = doc["paper_length_mm"].as<float>();
+    if (L <= 0.0f) {
+        sendResult(400, false, "calib", "bad_paper_length");
+        return;
+    }
+    s_calibReady = false;
+    s_calibBits = 0;
+    rt::onCalibArm(L);
+
+    bool got = false;
+    for (int i = 0; i < 150; ++i) {            // up to 15 s
+        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100)) != 0) {
+            if (s_calibReady) { got = true; break; }
+        }
+        if (s_calibReady) { got = true; break; }
+        s_dns.processNextRequest();
+        s_server.handleClient();
+    }
+    if (!got) {
+        sendResult(408, false, "calib", "timeout");
+        return;
+    }
+    float ppm;
+    uint32_t bits = s_calibBits;
+    memcpy(&ppm, &bits, sizeof(bits));
+
+    JsonDocument resp;
+    resp["ok"] = true;
+    resp["pulses_per_mm"] = ppm;
+    String out;
+    serializeJson(resp, out);
+    s_server.send(200, "application/json", out);
+}
+
 static void networkTask(void*) {
     uint64_t mac = ESP.getEfuseMac();
     snprintf(s_ssid, sizeof(s_ssid), "GlueController-%04X", (uint16_t)mac);
@@ -262,8 +330,12 @@ static void networkTask(void*) {
         sendResult(200, true, "control_release");
     });
     s_server.on("/api/command", HTTP_POST, handleCommand);
+    s_server.on("/api/calibrate", HTTP_POST, handleCalib);
     s_server.onNotFound(sendIndex);
     s_server.begin();
+
+    s_netTask = xTaskGetCurrentTaskHandle();
+    evt::setCallback(onNetEvent, nullptr);
 
     for (;;) {
         s_dns.processNextRequest();

@@ -83,8 +83,8 @@ def cmd_set_pattern(gun_1based: int, ptype: PatternType,
 def cmd_test_open(gun_1based: int, timeout_ms: int = 1000) -> dict[str, Any]:
     if not 0 <= gun_1based <= NUM_GUNS:
         raise ValueError(f"gun out of range: {gun_1based}")
-    if not 1 <= timeout_ms <= 5000:
-        raise ValueError("timeout_ms must be 1..5000")
+    if not 1 <= timeout_ms <= 10000:
+        raise ValueError("timeout_ms must be 1..10000")
     return {"cmd": "test_open", "gun": gun_1based, "timeout_ms": timeout_ms}
 
 

@@ -41,6 +41,10 @@ void init();                                  // creates queue + spawns emitter
 bool post(const Event& e);                    // task context
 bool postFromISR(const Event& e, BaseType_t* hpWoken);
 
+// Optional second subscriber (e.g. HTTP server). Called from task and ISR ctx.
+using EventCallback = void(*)(const Event&, void*);
+void setCallback(EventCallback cb, void* user = nullptr);
+
 // --- Convenience helpers (task context only) ---
 void postReady();
 void postAck(const char* cmd);

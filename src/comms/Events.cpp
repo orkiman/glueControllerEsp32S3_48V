@@ -6,6 +6,12 @@ namespace evt {
 
 static constexpr UBaseType_t QUEUE_LEN = 32;
 static QueueHandle_t s_queue = nullptr;
+static EventCallback s_cb = nullptr;
+static void* s_cbUser = nullptr;
+
+static inline void invokeCb(const Event& e) {
+    if (s_cb) s_cb(e, s_cbUser);
+}
 
 static void emitterTask(void*) {
     Event e;
@@ -68,12 +74,21 @@ void init() {
 
 bool post(const Event& e) {
     if (!s_queue) return false;
-    return xQueueSend(s_queue, &e, 0) == pdTRUE;
+    bool ok = xQueueSend(s_queue, &e, 0) == pdTRUE;
+    if (ok) invokeCb(e);
+    return ok;
 }
 
 bool postFromISR(const Event& e, BaseType_t* hpWoken) {
     if (!s_queue) return false;
-    return xQueueSendFromISR(s_queue, &e, hpWoken) == pdTRUE;
+    bool ok = xQueueSendFromISR(s_queue, &e, hpWoken) == pdTRUE;
+    if (ok) invokeCb(e);
+    return ok;
+}
+
+void setCallback(EventCallback cb, void* user) {
+    s_cb = cb;
+    s_cbUser = user;
 }
 
 static inline void setStr(char* dst, size_t cap, const char* src) {

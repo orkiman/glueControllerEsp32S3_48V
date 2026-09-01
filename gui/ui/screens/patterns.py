@@ -46,11 +46,14 @@ class GunToolbar(QGroupBox):
                                       0.2, 50.0, 0.1, 2)
         self.f_droplet.bind(self._on_on_timeout_changed)
 
-        btn_add  = QPushButton("הוסף מקטע")
+        btn_add  = QPushButton("הוסף")
+        btn_add.setToolTip("הוסף מקטע חדש")
         btn_add.clicked.connect(lambda: editor.add_segment(gun_idx))
         btn_clr  = QPushButton("נקה")
+        btn_clr.setToolTip("נקה את כל המקטעים של האקדח")
         btn_clr.clicked.connect(lambda: editor.clear_gun(gun_idx))
         btn_test = QPushButton("בדיקה")
+        btn_test.setToolTip("הפעל/עצור בדיקת אקדח")
         btn_test.setCheckable(True)
         btn_test.toggled.connect(self._on_test_toggled)
         self.btn_test = btn_test
@@ -118,7 +121,7 @@ class GunToolbar(QGroupBox):
 
     def _on_test_toggled(self, on: bool) -> None:
         gun_1based = self.gun_idx + 1
-        self.btn_test.setText("עצור בדיקה" if on else "בדיקה")
+        self.btn_test.setText("עצור" if on else "בדיקה")
         if on:
             self.state.test_open(gun_1based, timeout_ms=5000)
             self._test_timer.start(5000)
