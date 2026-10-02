@@ -198,8 +198,7 @@ class ConnectionBar(QWidget):
             if self._auto_connect:
                 self._auto_connect = False
                 # Defer to the next event-loop iteration so this is sent
-                # after AppState._on_link_conn runs push_full_state (which
-                # ends with a set_active(False)).
+                # after AppState._on_link_conn has requested the state.
                 QTimer.singleShot(0, self._set_active_safe)
         else:
             self.status_label.setText("מנותק" if not reason else f"מנותק — {reason}")

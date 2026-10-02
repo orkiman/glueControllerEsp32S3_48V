@@ -108,6 +108,12 @@ def cmd_list_programs() -> dict[str, Any]:
     return {"cmd": "list_programs"}
 
 
+def cmd_get_state() -> dict[str, Any]:
+    """Ask the controller for its full state: one config event, one pattern
+    event per gun and a programs_list event."""
+    return {"cmd": "get_state"}
+
+
 def cmd_save_program(id: int, name: str) -> dict[str, Any]:
     return {"cmd": "save_program", "id": int(id), "name": str(name)}
 

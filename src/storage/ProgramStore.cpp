@@ -425,7 +425,6 @@ bool list(ProgramMeta* out, size_t maxCount, size_t& outCount) {
 bool save(uint8_t id, const char* name, uint8_t* outId) {
     MutexLock lock(s_mtx);
     if (!s_mounted) return false;
-    if (cfg::g_sys.active.load()) return false;
     if (!name || !name[0]) return false;
     return saveInternalLocked(id, name, outId);
 }
@@ -433,7 +432,6 @@ bool save(uint8_t id, const char* name, uint8_t* outId) {
 bool load(uint8_t id) {
     MutexLock lock(s_mtx);
     if (!s_mounted) return false;
-    if (cfg::g_sys.active.load()) return false;
     if (id == 0) return false;
     if (!findIndexEntry(id)) return false;
     if (!loadProgramFromFile(id)) return false;
@@ -447,7 +445,6 @@ bool load(uint8_t id) {
 bool rename(uint8_t id, const char* name) {
     MutexLock lock(s_mtx);
     if (!s_mounted) return false;
-    if (cfg::g_sys.active.load()) return false;
     if (id == 0 || !name || !name[0]) return false;
     ProgramMeta* e = findIndexEntry(id);
     if (!e) return false;
@@ -460,7 +457,6 @@ bool rename(uint8_t id, const char* name) {
 bool erase(uint8_t id) {
     MutexLock lock(s_mtx);
     if (!s_mounted) return false;
-    if (cfg::g_sys.active.load()) return false;
     if (id == 0) return false;
     int idx = findIndexIndex(id);
     if (idx < 0) return false;
@@ -505,7 +501,6 @@ void service() {
     MutexLock lock(s_mtx);
     if (!s_dirty || !s_mounted) return;
     if ((uint32_t)(millis() - s_dirtySinceMs) < 2000u) return;
-    if (cfg::g_sys.active.load()) return;
     if (s_activeId == 0 || s_activeName[0] == '\0') return;
     if (saveInternalLocked(s_activeId, s_activeName, nullptr)) {
         s_dirty = false;

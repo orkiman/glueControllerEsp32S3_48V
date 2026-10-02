@@ -114,9 +114,10 @@ currently configured pattern type (see `rt/TestRunner.cpp`):
   `g_sys.fault = true`, `g_sys.active = false`, and emits
   `{"event":"error","reason":"hardware_fault"}`.
 - Recovery requires a fresh `set_active:true` from the operator.
-- **Watchdog**: any received NDJSON command (incl. `ping`) refreshes the
-  timestamp. After 2 s of silence while active, outputs are killed and
-  `{"event":"watchdog_timeout"}` is emitted.
+- **Watchdog**: any received NDJSON command (incl. `ping`) and the web
+  page's `/api/control/heartbeat` (sent every 500 ms while the page is
+  visible) refresh the timestamp. After 2 s of silence from both while
+  active, outputs are killed and `{"event":"watchdog_timeout"}` is emitted.
 
 ---
 
@@ -131,6 +132,32 @@ currently configured pattern type (see `rt/TestRunner.cpp`):
 
 All other validation errors (`bad_pulses_per_mm`, `hold_ge_pick`, etc.) are
 sanity checks in `set_config` / `set_pattern`.
+
+### 7.1a Shared control — PC and web together
+
+There is no control owner any more: the PC (UART) and the phone (SoftAP web
+page) may both change config, patterns and programs at any time, **including
+while the machine is active** (a SPIFFS write can cause a brief timing
+hiccup). `comms/LiveSync.{h,cpp}` keeps them consistent:
+
+- One recursive edit lock serialises every writer of the config buffer and
+  the program store (UART RX task, web handlers, autosave, calibration).
+- A revision counter increments on every change. `/api/status` reports
+  `rev` and `program_id`; the page reloads what it shows when `rev` moves,
+  skipping a field the user is typing in until they leave it. Responses to
+  changing requests carry `prev` / `rev` so the page ignores its own edits.
+- Changes not made over UART are pushed to the PC as `config`, `pattern`
+  and `programs_list` events. A rejected `set_config` / `set_pattern` from
+  the PC is answered with the unchanged state so the GUI reverts.
+- Calibration results are applied in task context (not from the ISR),
+  autosaved, and broadcast like any other change.
+
+New UART command: `{"cmd":"get_state"}` replies with one `config` event,
+one `pattern` event per gun and a `programs_list` event. The GUI sends it on
+connect and after `ready`, and never pushes its local defaults.
+
+The UART line limit and the web command body limit are 4096 bytes, so a full
+64-element pattern fits.
 
 ### 7.2 `on_timeout_ms` — per-gun, start-of-cycle
 
@@ -167,7 +194,7 @@ Example payload:
 
 | Feature | Notes |
 | ------- | ----- |
-| Multi-program management | `app/programs.py` + `ui/widgets/program_bar.py` — dropdown, save, save-as, delete, auto-save, auto-load last |
+| Multi-program management | `ui/widgets/program_bar.py` — the program store lives on the controller (SPIFFS) and is shared with the web UI; dropdown, save, save-as, new, delete; edits autosave 2 s after the last change, also while running |
 | Event log filtering | Routine `status` and `ping_ack` events hidden by default; opt-in checkbox to show them |
 | Outbound command log | All `_send()` calls (except ping) appear in the event log |
 | Dynamic canvas | Canvas grows automatically when a segment is dragged or added outside current bounds |
@@ -178,8 +205,9 @@ Example payload:
 | Live pattern type push | Toolbar combo changes push `set_pattern` immediately to the firmware |
 | `set_pattern type:none` | Firmware now accepts `none` to clear/disable a gun |
 | COM port persistence | Dropdown auto-selects the last port, switches ports when changed, and saves the last connected port |
-| Auto-sync on reconnect | Config + all patterns are pushed automatically when the serial link opens, so startup program loads are not lost |
-| Resync on firmware reboot | GUI re-pushes full state whenever a `ready` event arrives (USB-CDC link survives an ESP reboot, so the connect signal never drops) |
+| Sync on connect | GUI pulls the controller state with `get_state` when the link opens; the controller is the source of truth |
+| Resync on firmware reboot | GUI pulls the state again whenever a `ready` event arrives (the controller restores its active program from flash at boot) |
+| Live sync with web UI | Web-side edits arrive as `config` / `pattern` / `programs_list` events and update the GUI immediately |
 | ISR-safe abort (firmware) | `seq::abort` no longer calls `esp_timer_stop` from `faultIsr` (ISR context) — this was panicking/rebooting the ESP32 on every `test_open` when nFAULT asserted (e.g. DRV8262 with no 48 V) |
 | Clean shutdown | `MainWindow.closeEvent` closes the serial thread before exit to avoid QThread warnings |
 | Test button safety | Test button disabled when disconnected or system inactive; shows "עצור בדיקה" while running; auto-releases on timeout/error |
@@ -223,7 +251,7 @@ docs/
 src/                           (ESP32-S3 firmware)
   main.cpp
   config/Config.{h,cpp}
-  comms/Events.{h,cpp}    UartJson.{h,cpp}
+  comms/Events.{h,cpp}    UartJson.{h,cpp}   CommandDispatcher.{h,cpp}   LiveSync.{h,cpp}
   hw/Pins.h               Driver.{h,cpp}   Dac.{h,cpp}   Encoder.{h,cpp}
   rt/Control.{h,cpp}      GunSequencer.{h,cpp}   PatternScheduler.{h,cpp}   TestRunner.{h,cpp}
   sys/Fault.{h,cpp}       Watchdog.{h,cpp}       Status.{h,cpp}

@@ -27,35 +27,37 @@ void onRuntimeInitialized();
 // blocked by an active run.
 bool list(ProgramMeta* out, size_t maxCount, size_t& outCount);
 
+// All mutating calls below are allowed while the system is active (a SPIFFS
+// write may cause a brief timing hiccup).  Callers serialise them with the
+// livesync edit lock.
+
 // Save the current active RuntimeConfig snapshot.
 //   id == 0  -> create a new program (stable id is written to *outId if given)
 //   id != 0  -> overwrite existing program
-// Returns false while the system is active or on any I/O/validation error.
+// Returns false on any I/O/validation error.
 bool save(uint8_t id, const char* name, uint8_t* outId = nullptr);
 
-// Load a stored snapshot by its stable numeric id.  Returns false while the
-// system is active, if the id is unknown, or if the JSON fails strict validation.
+// Load a stored snapshot by its stable numeric id.  Returns false if the id is
+// unknown or if the JSON fails strict validation.
 bool load(uint8_t id);
 
-// Rename an existing program.  Returns false while active or on error.
+// Rename an existing program.  Returns false on error.
 bool rename(uint8_t id, const char* name);
 
 // Delete an existing program by stable numeric id.  If the deleted program was
 // the active one, the next remaining program is loaded automatically; if no
-// programs remain, a safe default program is seeded.  Returns false while
-// active or on error.
+// programs remain, a safe default program is seeded.  Returns false on error.
 bool erase(uint8_t id);
 
 // Active program identity.
 uint8_t activeId();
 bool    activeName(char* buf, size_t cap);
 
-// Mark the current active config as dirty so service() will autosave it once
-// the system becomes inactive.
+// Mark the current active config as dirty so service() autosaves it.
 void markDirty();
 
-// Call periodically from Core-0 task context (e.g. the network loop).  Performs
-// one deferred autosave when the config is dirty and the system is inactive.
+// Call periodically from Core-0 task context (e.g. the network loop), with the
+// livesync lock held.  Performs one deferred autosave 2 s after the last edit.
 void service();
 
 } // namespace prog

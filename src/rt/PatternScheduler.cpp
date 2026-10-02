@@ -4,6 +4,7 @@
 #include "hw/Pins.h"
 #include "config/Config.h"
 #include "comms/Events.h"
+#include "comms/LiveSync.h"
 
 #include <atomic>
 #include <freertos/FreeRTOS.h>
@@ -164,11 +165,10 @@ void IRAM_ATTR onPhotocellFallingEdge(uint32_t pulseAtEdge) {
     float ppm = (float)(pulseAtEdge - lead) / L;
     s_calib.store(CalibState::Idle, std::memory_order_release);
 
-    // Publish new pulses_per_mm via the config double-buffer.
-    cfg::RuntimeConfig* sc = cfg::Config::editScratch();
-    sc->pulses_per_mm = ppm;
-    cfg::Config::publish();
-    pattern::onConfigApplied();
+    // Applying pulses_per_mm to the config double-buffer happens in task
+    // context (livesync::service) under the shared edit lock, so an ISR never
+    // races a UART / web edit of the scratch buffer.
+    livesync::postCalibration(ppm);
 
     evt::Event e{}; e.kind = evt::Kind::CalibResult; e.f1 = ppm;
     BaseType_t hp = pdFALSE;

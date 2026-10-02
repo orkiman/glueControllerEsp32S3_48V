@@ -1,7 +1,7 @@
 #include "SoftAP.h"
 #include "WebPage.h"
 #include "comms/CommandDispatcher.h"
-#include "comms/ControlAuthority.h"
+#include "comms/LiveSync.h"
 #include "comms/Events.h"
 #include "config/Config.h"
 #include "hw/Pins.h"
@@ -59,14 +59,31 @@ static void sendResult(int status, bool ok, const char* command = "",
     s_server.send(status, "application/json", body);
 }
 
+// Result for a request that may have changed shared state.  `prev` / `rev`
+// are the revision before and after it; the page uses them to tell its own
+// changes apart from changes made by the PC.
+static void sendChangeResult(int status, bool ok, const char* command,
+                             const char* reason, uint32_t prev, uint32_t rev) {
+    JsonDocument doc;
+    doc["ok"] = ok;
+    if (command[0]) doc["cmd"] = command;
+    if (reason[0]) doc["reason"] = reason;
+    doc["prev"] = prev;
+    doc["rev"] = rev;
+    String body;
+    serializeJson(doc, body);
+    s_server.send(status, "application/json", body);
+}
+
 static void sendStatus() {
     pattern::Metrics metrics = pattern::metrics();
     JsonDocument doc;
+    doc["rev"] = livesync::revision();
+    doc["program_id"] = prog::activeId();
     doc["active"] = cfg::g_sys.active.load(std::memory_order_acquire);
     doc["fault"] = cfg::g_sys.fault.load(std::memory_order_acquire);
     doc["pos_mm"] = pattern::currentPosMm();
     doc["speed_mm_s"] = pattern::currentSpeedMmS();
-    doc["control_owner"] = control::ownerName();
     doc["max_loop_gap_us"] = metrics.max_loop_gap_us;
     doc["max_event_late_pulses"] = metrics.max_event_late_pulses;
     doc["pattern_events"] = metrics.pattern_events;
@@ -77,8 +94,10 @@ static void sendStatus() {
 }
 
 static void sendConfig() {
+    livesync::Guard guard;
     const cfg::RuntimeConfig* config = cfg::Config::active();
     JsonDocument doc;
+    doc["rev"] = livesync::revision();
     doc["pulses_per_mm"] = config->pulses_per_mm;
     doc["min_speed_mm_s"] = config->min_speed_mm_s;
     doc["photocell_offset_mm"] = config->photocell_offset_mm;
@@ -101,8 +120,10 @@ static void sendPattern() {
         sendResult(400, false, "", "invalid_gun");
         return;
     }
+    livesync::Guard guard;
     const cfg::GunPattern& pattern = cfg::Config::active()->pattern[gun - 1];
     JsonDocument doc;
+    doc["rev"] = livesync::revision();
     doc["gun"] = gun;
     doc["type"] = pattern.type == cfg::PatternType::Lines ? "lines" :
                   pattern.type == cfg::PatternType::Dots ? "dots" : "none";
@@ -127,18 +148,6 @@ static bool parseProgramRequest(JsonDocument& doc) {
     return !deserializeJson(doc, body);
 }
 
-static bool canManagePrograms() {
-    if (!control::canUse(control::Owner::Web)) {
-        sendResult(423, false, "program", "control_busy");
-        return false;
-    }
-    if (cfg::g_sys.active.load(std::memory_order_acquire)) {
-        sendResult(409, false, "program", "active");
-        return false;
-    }
-    return true;
-}
-
 static void sendPrograms() {
     prog::ProgramMeta programs[prog::MAX_PROGRAMS];
     size_t count = 0;
@@ -147,6 +156,7 @@ static void sendPrograms() {
         return;
     }
     JsonDocument doc;
+    doc["rev"] = livesync::revision();
     doc["active_id"] = prog::activeId();
     JsonArray items = doc["programs"].to<JsonArray>();
     for (size_t i = 0; i < count; ++i) {
@@ -159,16 +169,9 @@ static void sendPrograms() {
     s_server.send(200, "application/json", body);
 }
 
-static void notifySerialPrograms() {
-    prog::ProgramMeta programs[prog::MAX_PROGRAMS];
-    size_t count = 0;
-    if (prog::list(programs, prog::MAX_PROGRAMS, count)) {
-        evt::postProgramsList(programs, count, prog::activeId());
-    }
-}
-
 static void handleProgramSave() {
-    if (!canManagePrograms()) return;
+    livesync::Guard guard;
+    uint32_t prev = livesync::revision();
     JsonDocument doc;
     if (!parseProgramRequest(doc)) {
         sendResult(400, false, "program_save", "bad_json");
@@ -187,37 +190,35 @@ static void handleProgramSave() {
         sendResult(409, false, "program_save", "save_failed");
         return;
     }
-    notifySerialPrograms();
+    livesync::programsChanged();
     JsonDocument response;
     response["ok"] = true;
     response["id"] = savedId;
     response["name"] = name;
+    response["prev"] = prev;
+    response["rev"] = livesync::revision();
     String body;
     serializeJson(response, body);
     s_server.send(200, "application/json", body);
 }
 
 static void handleProgramLoad() {
-    if (!canManagePrograms()) return;
+    livesync::Guard guard;
+    uint32_t prev = livesync::revision();
     JsonDocument doc;
     if (!parseProgramRequest(doc) || !doc["id"].is<uint8_t>()) {
         sendResult(400, false, "program_load", "bad_request");
         return;
     }
     bool ok = prog::load(doc["id"].as<uint8_t>());
-    if (ok) {
-        const cfg::RuntimeConfig* c = cfg::Config::active();
-        evt::postConfig(c);
-        for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
-            evt::postPattern(g + 1, &c->pattern[g]);
-        }
-        notifySerialPrograms();
-    }
-    sendResult(ok ? 200 : 404, ok, "program_load", ok ? "" : "load_failed");
+    if (ok) livesync::programLoaded();
+    sendChangeResult(ok ? 200 : 404, ok, "program_load", ok ? "" : "load_failed",
+                     prev, livesync::revision());
 }
 
 static void handleProgramRename() {
-    if (!canManagePrograms()) return;
+    livesync::Guard guard;
+    uint32_t prev = livesync::revision();
     JsonDocument doc;
     if (!parseProgramRequest(doc) || !doc["id"].is<uint8_t>()) {
         sendResult(400, false, "program_rename", "bad_request");
@@ -230,41 +231,40 @@ static void handleProgramRename() {
         return;
     }
     bool ok = prog::rename(doc["id"].as<uint8_t>(), name);
-    if (ok) notifySerialPrograms();
-    sendResult(ok ? 200 : 404, ok, "program_rename", ok ? "" : "rename_failed");
+    if (ok) livesync::programsChanged();
+    sendChangeResult(ok ? 200 : 404, ok, "program_rename", ok ? "" : "rename_failed",
+                     prev, livesync::revision());
 }
 
 static void handleProgramDelete() {
-    if (!canManagePrograms()) return;
+    livesync::Guard guard;
+    uint32_t prev = livesync::revision();
     JsonDocument doc;
     if (!parseProgramRequest(doc) || !doc["id"].is<uint8_t>()) {
         sendResult(400, false, "program_delete", "bad_request");
         return;
     }
     bool ok = prog::erase(doc["id"].as<uint8_t>());
-    if (ok) notifySerialPrograms();
-    sendResult(ok ? 200 : 404, ok, "program_delete", ok ? "" : "delete_failed");
+    // Deleting the active program loads another one, so resend everything.
+    if (ok) livesync::programLoaded();
+    sendChangeResult(ok ? 200 : 404, ok, "program_delete", ok ? "" : "delete_failed",
+                     prev, livesync::revision());
 }
 
 static void handleCommand() {
-    if (!control::canUse(control::Owner::Web)) {
-        sendResult(423, false, "", "control_busy");
-        return;
-    }
     String body = s_server.arg("plain");
-    if (body.length() == 0 || body.length() >= 1024) {
+    if (body.length() == 0 || body.length() >= 4096) {
         sendResult(400, false, "", "bad_length");
         return;
     }
-    cmd::Result result = cmd::dispatch(body.c_str(), body.length());
-    sendResult(result.ok ? 200 : 400, result.ok, result.cmd, result.reason);
+    livesync::Guard guard;
+    uint32_t prev = livesync::revision();
+    cmd::Result result = cmd::dispatch(body.c_str(), body.length(), livesync::Source::Web);
+    sendChangeResult(result.ok ? 200 : 400, result.ok, result.cmd, result.reason,
+                     prev, livesync::revision());
 }
 
 static void handleCalib() {
-    if (!control::canUse(control::Owner::Web)) {
-        sendResult(423, false, "calib", "control_busy");
-        return;
-    }
     String body = s_server.arg("plain");
     JsonDocument doc;
     if (deserializeJson(doc, body) || !doc["paper_length_mm"].is<float>()) {
@@ -335,17 +335,17 @@ static void networkTask(void*) {
     s_server.on("/api/program/load", HTTP_POST, handleProgramLoad);
     s_server.on("/api/program/rename", HTTP_POST, handleProgramRename);
     s_server.on("/api/program/delete", HTTP_POST, handleProgramDelete);
-    s_server.on("/api/control/acquire", HTTP_POST, [] {
-        sendResult(control::acquireWeb() ? 200 : 409,
-                   control::canUse(control::Owner::Web), "control_acquire",
-                   control::canUse(control::Owner::Web) ? "" : "active");
-    });
+    // PC and web control the machine together.  The heartbeat keeps the link
+    // watchdog fed while a page is open; acquire / release are kept as no-ops
+    // for pages loaded from older firmware.
     s_server.on("/api/control/heartbeat", HTTP_POST, [] {
-        bool ok = control::heartbeatWeb();
-        sendResult(ok ? 200 : 409, ok, "heartbeat", ok ? "" : "not_owner");
+        cfg::g_sys.lastCmdMs.store(millis(), std::memory_order_release);
+        sendResult(200, true, "heartbeat");
+    });
+    s_server.on("/api/control/acquire", HTTP_POST, [] {
+        sendResult(200, true, "control_acquire");
     });
     s_server.on("/api/control/release", HTTP_POST, [] {
-        control::releaseWeb();
         sendResult(200, true, "control_release");
     });
     s_server.on("/api/command", HTTP_POST, handleCommand);
@@ -359,7 +359,11 @@ static void networkTask(void*) {
     for (;;) {
         s_dns.processNextRequest();
         s_server.handleClient();
-        prog::service();
+        livesync::service();
+        {
+            livesync::Guard guard;
+            prog::service();
+        }
         vTaskDelay(pdMS_TO_TICKS(2));
     }
 }

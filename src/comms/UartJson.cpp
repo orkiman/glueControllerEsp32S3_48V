@@ -1,6 +1,5 @@
 #include "UartJson.h"
 #include "CommandDispatcher.h"
-#include "ControlAuthority.h"
 #include "Events.h"
 #include "hw/Pins.h"
 
@@ -8,7 +7,7 @@
 
 namespace uartjson {
 
-static constexpr size_t LINE_CAP = 1024;
+static constexpr size_t LINE_CAP = 4096;   // fits a full 64-element pattern
 
 // -------- RX task ----------------------------------------------------------
 
@@ -28,12 +27,7 @@ static void rxTask(void*) {
                     evt::postError("", "line_too_long");
                 } else if (len > 0) {
                     line[len] = '\0';
-                    if (!control::canUse(control::Owner::Uart)) {
-                        evt::postError("", "control_busy");
-                        len = 0;
-                        continue;
-                    }
-                    cmd::Result res = cmd::dispatch(line, len);
+                    cmd::Result res = cmd::dispatch(line, len, livesync::Source::Uart);
                     if (res.ok) {
                         evt::postAck(res.cmd);
                     } else {

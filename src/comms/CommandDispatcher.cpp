@@ -11,6 +11,9 @@
 
 namespace cmd {
 
+// Source of the command currently being dispatched (valid under the lock).
+static livesync::Source s_src = livesync::Source::Uart;
+
 static inline void setStr(char* dst, size_t cap, const char* src) {
     if (!src) { dst[0] = '\0'; return; }
     strncpy(dst, src, cap - 1);
@@ -78,20 +81,40 @@ static Result handleSetConfig(JsonDocument& doc) {
     if (doc["hold_current_a"].is<float>())      s->hold_current_a      = doc["hold_current_a"];
     if (doc["encoder_source"].is<uint8_t>())    s->encoder_source      = doc["encoder_source"];
 
-    if (s->pulses_per_mm   <= 0.0f) { return makeResult(false, "set_config","bad_pulses_per_mm"); }
-    if (s->pick_current_a  <= 0.0f) { return makeResult(false, "set_config","bad_pick_current"); }
-    if (s->hold_current_a  <= 0.0f) { return makeResult(false, "set_config","bad_hold_current"); }
-    if (s->hold_current_a  >= s->pick_current_a) {
-        return makeResult(false, "set_config","hold_ge_pick"); }
-    if (s->encoder_source  > 1) { return makeResult(false, "set_config","bad_encoder_source"); }
+    const char* reason = nullptr;
+    if      (s->pulses_per_mm  <= 0.0f)              reason = "bad_pulses_per_mm";
+    else if (s->pick_current_a <= 0.0f)              reason = "bad_pick_current";
+    else if (s->hold_current_a <= 0.0f)              reason = "bad_hold_current";
+    else if (s->hold_current_a >= s->pick_current_a) reason = "hold_ge_pick";
+    else if (s->encoder_source > 1)                  reason = "bad_encoder_source";
+    if (reason) {
+        // Rejected: re-send the unchanged config so the PC drops its local edit.
+        if (s_src == livesync::Source::Uart) evt::postConfig(cfg::Config::active());
+        return makeResult(false, "set_config", reason);
+    }
 
     cfg::Config::publish();
     rt::onConfigApplied();
     prog::markDirty();
+    livesync::configChanged(s_src);
     return makeResult(true, "set_config");
 }
 
+static Result handleSetPatternImpl(JsonDocument& doc);
+
 static Result handleSetPattern(JsonDocument& doc) {
+    Result r = handleSetPatternImpl(doc);
+    if (!r.ok && s_src == livesync::Source::Uart) {
+        // Rejected: re-send the unchanged pattern so the PC drops its local edit.
+        uint8_t gun = doc["gun"] | 0;
+        if (gun >= 1 && gun <= pins::NUM_GUNS) {
+            evt::postPattern(gun, &cfg::Config::active()->pattern[gun - 1]);
+        }
+    }
+    return r;
+}
+
+static Result handleSetPatternImpl(JsonDocument& doc) {
     if (!doc["gun"].is<uint8_t>()) { return makeResult(false, "set_pattern","missing_gun"); }
     uint8_t gunOneBased = doc["gun"].as<uint8_t>();
     if (gunOneBased < 1 || gunOneBased > pins::NUM_GUNS) {
@@ -126,6 +149,7 @@ static Result handleSetPattern(JsonDocument& doc) {
     }
     cfg::Config::publish();
     prog::markDirty();
+    livesync::patternChanged(gunOneBased, s_src);
     return makeResult(true, "set_pattern");
 }
 
@@ -139,17 +163,14 @@ static Result handleCalibArm(JsonDocument& doc) {
     return makeResult(true, "calib_arm");
 }
 
-static void emitProgramsList() {
-    prog::ProgramMeta list[prog::MAX_PROGRAMS];
-    size_t count = 0;
-    if (prog::list(list, prog::MAX_PROGRAMS, count)) {
-        evt::postProgramsList(list, count, prog::activeId());
-    }
+static Result handleListPrograms(JsonDocument&) {
+    livesync::emitProgramsList();
+    return makeResult(true, "list_programs");
 }
 
-static Result handleListPrograms(JsonDocument&) {
-    emitProgramsList();
-    return makeResult(true, "list_programs");
+static Result handleGetState(JsonDocument&) {
+    livesync::emitFullState();
+    return makeResult(true, "get_state");
 }
 
 static Result handleSaveProgram(JsonDocument& doc) {
@@ -160,7 +181,7 @@ static Result handleSaveProgram(JsonDocument& doc) {
     if (!prog::save(id, name, &outId)) {
         return makeResult(false, "save_program", "save_failed");
     }
-    emitProgramsList();
+    livesync::programsChanged();
     return makeResult(true, "save_program");
 }
 
@@ -169,12 +190,7 @@ static Result handleLoadProgram(JsonDocument& doc) {
     if (id == 0 || !prog::load(id)) {
         return makeResult(false, "load_program", "load_failed");
     }
-    const cfg::RuntimeConfig* c = cfg::Config::active();
-    evt::postConfig(c);
-    for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
-        evt::postPattern(g + 1, &c->pattern[g]);
-    }
-    emitProgramsList();
+    livesync::programLoaded();
     return makeResult(true, "load_program");
 }
 
@@ -185,7 +201,7 @@ static Result handleRenameProgram(JsonDocument& doc) {
     if (!prog::rename(id, name)) {
         return makeResult(false, "rename_program", "rename_failed");
     }
-    emitProgramsList();
+    livesync::programsChanged();
     return makeResult(true, "rename_program");
 }
 
@@ -194,7 +210,8 @@ static Result handleDeleteProgram(JsonDocument& doc) {
     if (id == 0 || !prog::erase(id)) {
         return makeResult(false, "delete_program", "delete_failed");
     }
-    emitProgramsList();
+    // Deleting the active program loads another one, so resend everything.
+    livesync::programLoaded();
     return makeResult(true, "delete_program");
 }
 
@@ -228,13 +245,21 @@ static Result handleSwTrigger(JsonDocument&) {
     return makeResult(true, "sw_trigger");
 }
 
-Result dispatch(const char* line, size_t len) {
+static Result dispatchLocked(JsonDocument& doc);
+
+Result dispatch(const char* line, size_t len, livesync::Source src) {
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, line, len);
     if (err) { return makeResult(false, "", "bad_json"); }
 
-    const char* command = doc["cmd"] | "";
     feedWatchdog();
+    livesync::Guard guard;
+    s_src = src;
+    return dispatchLocked(doc);
+}
+
+static Result dispatchLocked(JsonDocument& doc) {
+    const char* command = doc["cmd"] | "";
 
     if      (!strcmp(command, "set_active"))      return handleSetActive(doc);
     else if (!strcmp(command, "set_config"))      return handleSetConfig(doc);
@@ -244,6 +269,7 @@ Result dispatch(const char* line, size_t len) {
     else if (!strcmp(command, "test_close"))     return handleTestClose(doc);
     else if (!strcmp(command, "ping"))            return handlePing(doc);
     else if (!strcmp(command, "sw_trigger"))     return handleSwTrigger(doc);
+    else if (!strcmp(command, "get_state"))      return handleGetState(doc);
     else if (!strcmp(command, "list_programs"))  return handleListPrograms(doc);
     else if (!strcmp(command, "save_program"))   return handleSaveProgram(doc);
     else if (!strcmp(command, "load_program"))   return handleLoadProgram(doc);

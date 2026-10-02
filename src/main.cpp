@@ -2,6 +2,7 @@
 
 #include "config/Config.h"
 #include "comms/Events.h"
+#include "comms/LiveSync.h"
 #include "comms/UartJson.h"
 #include "storage/ProgramStore.h"
 #include "hw/Driver.h"
@@ -33,6 +34,7 @@
 void setup() {
     // ---- 1. Config defaults (both buffers seeded) ----
     cfg::Config::init();
+    livesync::init();     // shared edit lock for UART + web (before any task)
 
     // ---- 2. Safe-state every output BEFORE anything else can fire ----
     drv::init();
