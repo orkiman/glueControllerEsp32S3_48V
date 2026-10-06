@@ -27,3 +27,6 @@ fp-info-cache
 # KiCAD/hardware library conversion artifacts & exports
 hardware/*.pdf
 hardware/myLibs/**/*.bak
+
+# GUI runtime log
+gui/debug.log
