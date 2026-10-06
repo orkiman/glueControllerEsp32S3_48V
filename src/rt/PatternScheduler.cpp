@@ -49,6 +49,8 @@ enum class CalibState : uint8_t { Idle = 0, ArmedLeading = 1, ArmedTrailing = 2 
 static std::atomic<CalibState> s_calib{CalibState::Idle};
 static std::atomic<float>      s_calibPaperLen{0.0f};
 static std::atomic<uint32_t>   s_calibLeadPulse{0};
+static std::atomic<uint32_t>   s_calibPulses{0};      // set by falling-edge ISR
+static std::atomic<bool>       s_calibDone{false};    // -> finishCalibration()
 
 // ---------------- speed estimation ----------------
 // Two independent measurements, both from polling the PCNT count in
@@ -249,22 +251,26 @@ void IRAM_ATTR onPhotocellEdge(uint32_t pulseAtEdge) {
 void IRAM_ATTR onPhotocellFallingEdge(uint32_t pulseAtEdge) {
     if (s_calib.load(std::memory_order_acquire) != CalibState::ArmedTrailing) return;
 
+    // Integer only: the FPU is off in ISR context.  patternTask does the
+    // pulses / length division (finishCalibration).
     uint32_t lead = s_calibLeadPulse.load(std::memory_order_acquire);
-    float    L    = s_calibPaperLen .load(std::memory_order_acquire);
-    if (L <= 0.0f) { s_calib.store(CalibState::Idle); return; }
-
-    float ppm = (float)(pulseAtEdge - lead) / L;
+    s_calibPulses.store(pulseAtEdge - lead, std::memory_order_release);
     s_calib.store(CalibState::Idle, std::memory_order_release);
+    s_calibDone.store(true, std::memory_order_release);
+}
 
-    // Applying pulses_per_mm to the config double-buffer happens in task
-    // context (livesync::service) under the shared edit lock, so an ISR never
-    // races a UART / web edit of the scratch buffer.
+// Task context (patternTask): turn the measured pulse count into pulses/mm.
+static void finishCalibration() {
+    uint32_t pulses = s_calibPulses.load(std::memory_order_acquire);
+    float    L      = s_calibPaperLen.load(std::memory_order_acquire);
+    if (L <= 0.0f) return;
+    float ppm = (float)pulses / L;
+
+    // Applying pulses_per_mm to the config double-buffer happens in
+    // livesync::service under the shared edit lock, so this never races a
+    // UART / web edit of the scratch buffer.
     livesync::postCalibration(ppm);
-
-    evt::Event e{}; e.kind = evt::Kind::CalibResult; e.f1 = ppm;
-    BaseType_t hp = pdFALSE;
-    evt::postFromISR(e, &hp);
-    if (hp) portYIELD_FROM_ISR();
+    evt::postCalibResult(ppm);
 }
 
 // ---------------- PatternTask: poll events ----------------
@@ -292,6 +298,7 @@ static void patternTask(void*) {
             s_lastSpeedMmS.store(sampleDisplaySpeed(now, nowUs), std::memory_order_release);
             lastSampleUs = nowUs;
         }
+        if (s_calibDone.exchange(false, std::memory_order_acq_rel)) finishCalibration();
 
         if (!active) {
             vTaskDelay(pdMS_TO_TICKS(5));

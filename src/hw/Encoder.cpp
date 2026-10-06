@@ -5,6 +5,13 @@
 #include <driver/pcnt.h>
 #include <driver/gpio.h>
 #include <esp_timer.h>
+// ISR paths use inline register access: the pcnt_* / gpio_* driver functions
+// live in flash and crash ("Cache disabled but cached memory region
+// accessed") if an IRAM ISR runs while Core 0 is writing flash.
+// (hal/pcnt_ll.h is not C++-clean in this IDF, so PCNT is accessed directly,
+// mirroring pcnt_ll_get_count / _get_unit_status / _clear_count.)
+#include <hal/gpio_ll.h>
+#include <soc/pcnt_struct.h>
 
 // Forward decls from pattern scheduler (Core 1).
 namespace pattern {
@@ -33,21 +40,28 @@ static volatile uint32_t s_pulseAccum[2] = {0, 0};
 static volatile int64_t s_lastEdgeUs = 0;
 static bool s_pcntIsrInstalled = false;
 
+static inline int16_t IRAM_ATTR pcntCount(pcnt_unit_t unit) {
+    return (int16_t)PCNT.cnt_unit[unit].pulse_cnt_un;
+}
+
+static inline void IRAM_ATTR pcntClear(pcnt_unit_t unit) {
+    PCNT.ctrl.val |=  (1u << (2 * unit));     // assert reset
+    PCNT.ctrl.val &= ~(1u << (2 * unit));     // release
+}
+
 static void IRAM_ATTR pcntOverflowIsr(void* arg) {
     uint8_t     src  = (uint8_t)(uintptr_t)arg;
     pcnt_unit_t unit = (src == 0) ? PCNT_UNIT_PRIMARY : PCNT_UNIT_ALT;
-    uint32_t    status = 0;
-    pcnt_get_event_status(unit, &status);
+    // Raw unit status register: same bit layout as the PCNT_EVT_* masks.
+    uint32_t    status = PCNT.status_unit[unit].val;
     if (status & PCNT_EVT_H_LIM) {
         s_pulseAccum[src] += (uint32_t)PCNT_LIMIT;
-        pcnt_counter_clear(unit);
+        pcntClear(unit);
     }
 }
 
 static inline uint32_t IRAM_ATTR readUnit(pcnt_unit_t unit, uint8_t src) {
-    int16_t cnt = 0;
-    pcnt_get_counter_value(unit, &cnt);
-    return s_pulseAccum[src] + (uint32_t)(uint16_t)cnt;
+    return s_pulseAccum[src] + (uint32_t)(uint16_t)pcntCount(unit);
 }
 
 uint32_t IRAM_ATTR pulseCount() {
@@ -63,7 +77,7 @@ static void IRAM_ATTR photocellIsr(void* /*arg*/) {
     s_lastEdgeUs = now;
 
     uint32_t p     = pulseCount();
-    int      level = gpio_get_level((gpio_num_t)pins::PHOTOCELL);
+    int      level = gpio_ll_get_level(&GPIO, (gpio_num_t)pins::PHOTOCELL);
     if (level) pattern::onPhotocellEdge(p);
     else       pattern::onPhotocellFallingEdge(p);
 }

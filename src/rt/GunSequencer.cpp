@@ -5,6 +5,7 @@
 #include "comms/Events.h"
 
 #include <driver/gpio.h>
+#include <hal/gpio_ll.h>
 #include <esp_timer.h>
 #include <atomic>
 
@@ -12,6 +13,16 @@
 #include <freertos/task.h>
 
 namespace seq {
+
+// IRAM-safe equivalent of gpio_intr_disable() (disable + clear pending).  The
+// driver function lives in flash; peakIsr and abort() (via faultIsr) run as
+// IRAM ISRs that may fire while Core 0 is writing flash.
+static inline void IRAM_ATTR peakIntrDisable(uint8_t g) {
+    gpio_num_t pin = (gpio_num_t)pins::PEAK_IRQ[g];
+    gpio_ll_intr_disable(&GPIO, pin);
+    if (pin < 32) gpio_ll_clear_intr_status(&GPIO, BIT(pin));
+    else          gpio_ll_clear_intr_status_high(&GPIO, BIT(pin - 32));
+}
 
 // Tunable: the Phase-3 "near zero" threshold (volts).
 // 0.1 V on the INA240 == 0.05 A coil current — small enough that the LM339
@@ -73,7 +84,7 @@ static void onTimerCb(void* user) {
     // If a peak trip is still pending we must mask the IRQ; otherwise a
     // late LM339 edge could re-enter peakIsr after we already dropped to
     // Phase 3 below.
-    gpio_intr_disable((gpio_num_t)pins::PEAK_IRQ[g]);
+    peakIntrDisable(g);
     if (s_diag.load(std::memory_order_acquire)) {
         // Report the outcome of this fire cycle.  Runs in esp_timer TASK
         // context, so floating-point (e.f1) is safe here -- unlike peakIsr,
@@ -99,7 +110,7 @@ static void IRAM_ATTR peakIsr(void* arg) {
     if (s_g[g].phase.load(std::memory_order_acquire) != Phase::Peak) return;
 
     // Mask own IRQ first thing -- avoid being flooded by chopping signals.
-    gpio_intr_disable((gpio_num_t)pins::PEAK_IRQ[g]);
+    peakIntrDisable(g);
 
     s_g[g].phase.store(Phase::Hold, std::memory_order_release);
 
@@ -127,7 +138,7 @@ static void initPeakPin(uint8_t g) {
     gpio_config(&c);
     gpio_isr_handler_add((gpio_num_t)pins::PEAK_IRQ[g],
                          peakIsr, (void*)(uintptr_t)g);
-    gpio_intr_disable((gpio_num_t)pins::PEAK_IRQ[g]);   // armed only during fire()
+    peakIntrDisable(g);   // armed only during fire()
 }
 
 static void initOnTimer(uint8_t g) {
@@ -224,7 +235,7 @@ void IRAM_ATTR abort(uint8_t g) {
     Phase p = s_g[g].phase.load(std::memory_order_acquire);
     if (p == Phase::Idle) return;
 
-    gpio_intr_disable((gpio_num_t)pins::PEAK_IRQ[g]);
+    peakIntrDisable(g);
     // esp_timer_stop() is NOT safe to call from an ISR (faultIsr -> abortAll
     // runs in interrupt context and would panic/reboot).  When called from a
     // task we stop the timer immediately; in ISR context we leave it armed --

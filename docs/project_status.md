@@ -46,6 +46,16 @@ embedded HMI later is a drop-in.
 - Config is published via atomic double-buffer pointer swap; hot path reads
   are lock-free.
 - Cross-core events use FreeRTOS queues with `*FromISR` APIs.
+- **ISRs are IRAM-only.**  GPIO/PCNT ISRs are installed with
+  `ESP_INTR_FLAG_IRAM`, so they keep running while Core 0 writes flash
+  (program/config autosave), when the flash cache is off.  Anything an ISR
+  touches must be in IRAM/DRAM: no `gpio_*` / `pcnt_*` driver calls (use
+  direct register access), no `constexpr` tables or string literals (flash
+  `.rodata` -> `DRAM_ATTR`), and no FPU.  Violations crash with
+  *"Cache disabled but cached memory region accessed"* a few seconds after a
+  settings change, and the controller reboots inactive (seen 2026-10-06,
+  fixed).  To check: disassemble the IRAM functions and flag any call or
+  `l32r` literal pointing into 0x42xxxxxx / 0x3Cxxxxxx.
 
 ---
 

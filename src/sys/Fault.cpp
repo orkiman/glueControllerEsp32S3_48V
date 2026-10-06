@@ -10,6 +10,9 @@
 
 namespace fault {
 
+// String literals live in flash .rodata; the ISR copies from this DRAM copy.
+static DRAM_ATTR const char kHardwareFault[] = "hardware_fault";
+
 static void IRAM_ATTR faultIsr(void*) {
     // Master kill: coast every gun.  All ISRs that try to fire later will see
     // g_sys.fault == true and refuse.
@@ -18,9 +21,8 @@ static void IRAM_ATTR faultIsr(void*) {
     cfg::g_sys.fault .store(true,  std::memory_order_release);
     cfg::g_sys.active.store(false, std::memory_order_release);
 
-    evt::Event e{}; e.kind = evt::Kind::Error;
-    strncpy(e.cmd,    "",                sizeof(e.cmd)    - 1);
-    strncpy(e.reason, "hardware_fault",  sizeof(e.reason) - 1);
+    evt::Event e{}; e.kind = evt::Kind::Error;     // e.cmd = "" (zeroed)
+    strncpy(e.reason, kHardwareFault, sizeof(e.reason) - 1);
 
     BaseType_t hp = pdFALSE;
     evt::postFromISR(e, &hp);

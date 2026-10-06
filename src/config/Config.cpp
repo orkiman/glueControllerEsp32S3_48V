@@ -13,7 +13,9 @@ void Config::init() {
     activeIdx_.store(0, std::memory_order_release);
 }
 
-const RuntimeConfig* Config::active() {
+// IRAM: called from GPIO / PCNT ISRs, which keep running while Core 0 writes
+// flash (cache off).  buf_ / activeIdx_ are internal DRAM.
+const RuntimeConfig* IRAM_ATTR Config::active() {
     return &buf_[activeIdx_.load(std::memory_order_acquire)];
 }
 

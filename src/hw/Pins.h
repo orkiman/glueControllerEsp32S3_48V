@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include <esp_attr.h>
 
 // =============================================================================
 // Cold Glue Controller - ESP32-S3 Pin Map
@@ -31,10 +32,13 @@ constexpr int8_t OPTO_IN[NUM_GUNS]    = { 1,  2,  4,  5  };
 constexpr int8_t ENCODER_ALT = OPTO_IN[3];
 
 // Per-gun pin arrays, indexed 0..3 (Gun 1..Gun 4).
-constexpr int8_t DRV_IN1[NUM_GUNS]    = { 6,  7, 15, 16  }; // DRV8262 IN1/IN3 main drive
-constexpr int8_t MUX_IN2[NUM_GUNS]    = { 8,  9, 17, 18  }; // MUX I0 input (manual ESP32 override)
-constexpr int8_t MUX_SELECT[NUM_GUNS] = {10, 11, 14, 48  }; // S=1 LM339 control, S=0 ESP32 control
-constexpr int8_t PEAK_IRQ[NUM_GUNS]   = {12, 13, 21, 38  }; // From LM339, ext 10k pull-up
+// DRAM_ATTR: these are indexed at runtime from IRAM ISRs (faultIsr, peakIsr,
+// seq::abort).  Plain constexpr tables land in flash .rodata, which is
+// unreadable while Core 0 writes flash -> "Cache disabled" panic.
+DRAM_ATTR constexpr int8_t DRV_IN1[NUM_GUNS]    = { 6,  7, 15, 16  }; // DRV8262 IN1/IN3 main drive
+DRAM_ATTR constexpr int8_t MUX_IN2[NUM_GUNS]    = { 8,  9, 17, 18  }; // MUX I0 input (manual ESP32 override)
+DRAM_ATTR constexpr int8_t MUX_SELECT[NUM_GUNS] = {10, 11, 14, 48  }; // S=1 LM339 control, S=0 ESP32 control
+DRAM_ATTR constexpr int8_t PEAK_IRQ[NUM_GUNS]   = {12, 13, 21, 38  }; // From LM339, ext 10k pull-up
 
 // Photocell / material-arrival trigger, shared by all guns (see OPTO_IN[0] above).
 constexpr int8_t PHOTOCELL = OPTO_IN[0];

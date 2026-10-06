@@ -30,7 +30,7 @@ public:
     ~StageLock() { if (s_stageMtx) xSemaphoreGive(s_stageMtx); }
 };
 
-static inline void invokeCb(const Event& e) {
+static inline void IRAM_ATTR invokeCb(const Event& e) {
     if (s_cb) s_cb(e, s_cbUser);
 }
 
@@ -163,7 +163,8 @@ bool post(const Event& e) {
     return ok;
 }
 
-bool postFromISR(const Event& e, BaseType_t* hpWoken) {
+// IRAM: called from ISRs (faultIsr) that can run while flash is being written.
+bool IRAM_ATTR postFromISR(const Event& e, BaseType_t* hpWoken) {
     if (!s_queue) return false;
     bool ok = xQueueSendFromISR(s_queue, &e, hpWoken) == pdTRUE;
     if (ok) invokeCb(e);

@@ -1,7 +1,22 @@
 #include "Driver.h"
 #include <driver/gpio.h>
+#include <soc/gpio_struct.h>
 
 namespace drv {
+
+// The IRAM setters below run from ISRs (faultIsr -> killAll, abort -> setIn1)
+// that can fire while Core 0 writes flash.  gpio_set_level() lives in flash,
+// and the compiler emitted gpio_ll_set_level() out of line in flash too, so
+// write the W1TS/W1TC registers directly (same as gpio_ll_set_level).
+static inline __attribute__((always_inline)) void pinWrite(int8_t pin, bool high) {
+    if (pin < 32) {
+        if (high) GPIO.out_w1ts = (1u << pin);
+        else      GPIO.out_w1tc = (1u << pin);
+    } else {
+        if (high) GPIO.out1_w1ts.data = (1u << (pin - 32));
+        else      GPIO.out1_w1tc.data = (1u << (pin - 32));
+    }
+}
 
 void init() {
     for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
@@ -24,22 +39,22 @@ void init() {
 }
 
 void IRAM_ATTR setIn1(uint8_t g, bool high) {
-    gpio_set_level((gpio_num_t)pins::DRV_IN1[g], high ? 1 : 0);
+    pinWrite(pins::DRV_IN1[g], high);
 }
 
 void IRAM_ATTR setMuxIn2(uint8_t g, bool high) {
-    gpio_set_level((gpio_num_t)pins::MUX_IN2[g], high ? 1 : 0);
+    pinWrite(pins::MUX_IN2[g], high);
 }
 
 void IRAM_ATTR setMuxSelect(uint8_t g, bool hwLoop) {
-    gpio_set_level((gpio_num_t)pins::MUX_SELECT[g], hwLoop ? 1 : 0);
+    pinWrite(pins::MUX_SELECT[g], hwLoop);
 }
 
 void IRAM_ATTR killAll() {
     for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
-        gpio_set_level((gpio_num_t)pins::DRV_IN1[g],    0);
-        gpio_set_level((gpio_num_t)pins::MUX_IN2[g],    0);
-        gpio_set_level((gpio_num_t)pins::MUX_SELECT[g], 0);  // coast under ESP32 control
+        pinWrite(pins::DRV_IN1[g],    false);
+        pinWrite(pins::MUX_IN2[g],    false);
+        pinWrite(pins::MUX_SELECT[g], false);  // coast under ESP32 control
     }
 }
 
