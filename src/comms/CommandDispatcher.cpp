@@ -245,6 +245,11 @@ static Result handleSwTrigger(JsonDocument&) {
     return makeResult(true, "sw_trigger");
 }
 
+static Result handleResetSheetCount(JsonDocument&) {
+    rt::onResetSheetCount();
+    return makeResult(true, "reset_sheet_count");
+}
+
 static Result dispatchLocked(JsonDocument& doc);
 
 Result dispatch(const char* line, size_t len, livesync::Source src) {
@@ -269,6 +274,7 @@ static Result dispatchLocked(JsonDocument& doc) {
     else if (!strcmp(command, "test_close"))     return handleTestClose(doc);
     else if (!strcmp(command, "ping"))            return handlePing(doc);
     else if (!strcmp(command, "sw_trigger"))     return handleSwTrigger(doc);
+    else if (!strcmp(command, "reset_sheet_count")) return handleResetSheetCount(doc);
     else if (!strcmp(command, "get_state"))      return handleGetState(doc);
     else if (!strcmp(command, "list_programs"))  return handleListPrograms(doc);
     else if (!strcmp(command, "save_program"))   return handleSaveProgram(doc);

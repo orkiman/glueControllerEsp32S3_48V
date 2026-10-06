@@ -26,6 +26,7 @@ class ProgramBar(QWidget):
         self.state = state
         self._refresh = refresh_cb
         self._loading = False
+        self.setAttribute(Qt.WA_StyledBackground, True)   # draw bottom border
 
         self.combo = QComboBox()
         self.combo.setMinimumWidth(220)

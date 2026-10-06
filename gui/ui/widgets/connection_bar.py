@@ -35,17 +35,29 @@ class StatusLed(QWidget):
 
 
 class ConnectionBar(QWidget):
-    def __init__(self, state: AppState) -> None:
+    """Header row.  `leading` (the run controls) sits at the start; the
+    connection status and port picker sit at the end.  The whole row turns
+    red while disconnected."""
+
+    def __init__(self, state: AppState, leading: QWidget | None = None) -> None:
         super().__init__()
         self.state = state
         self._auto_connect = False
+        # Paint our own stylesheet background (needed for the red state).
+        self.setAttribute(Qt.WA_StyledBackground, True)
 
+        # Compact: items show just the port name; the description is a tooltip.
         self.combo = QComboBox()
-        self.combo.setMinimumWidth(260)
+        self.combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.combo.currentIndexChanged.connect(self._on_port_changed)
+        self.combo.currentIndexChanged.connect(
+            lambda _i: self.combo.setToolTip(
+                self.combo.currentData(Qt.ToolTipRole) or ""))
         self.btn   = QPushButton("התחבר")
         self.btn.clicked.connect(self._toggle)
-        self.refresh = QPushButton("רענן")
+        self.refresh = QPushButton("↻")
+        self.refresh.setObjectName("IconButton")
+        self.refresh.setToolTip("רענן רשימת יציאות")
         self.refresh.clicked.connect(self._populate)
 
         self.led = StatusLed()
@@ -53,13 +65,16 @@ class ConnectionBar(QWidget):
 
         lay = QHBoxLayout(self)
         lay.setContentsMargins(12, 8, 12, 8)
-        lay.addWidget(QLabel("יציאה:"))
-        lay.addWidget(self.combo)
-        lay.addWidget(self.refresh)
-        lay.addWidget(self.btn)
+        lay.setSpacing(8)
+        if leading is not None:
+            lay.addWidget(leading)
         lay.addStretch(1)
         lay.addWidget(self.led)
         lay.addWidget(self.status_label)
+        lay.addSpacing(12)
+        lay.addWidget(self.combo)
+        lay.addWidget(self.refresh)
+        lay.addWidget(self.btn)
 
         self._populate()
         state.connection_changed.connect(self._on_conn)
@@ -83,13 +98,15 @@ class ConnectionBar(QWidget):
         last = SETTINGS.value(LAST_PORT_KEY, "")
         select_idx = -1
         for i, (dev, desc) in enumerate(list_ports()):
-            self.combo.addItem(f"{dev} — {desc}", dev)
+            self.combo.addItem(dev, dev)
+            self.combo.setItemData(i, desc, Qt.ToolTipRole)
             if dev == last:
                 select_idx = i
         if self.combo.count() == 0:
             self.combo.addItem("(לא נמצאו יציאות)", None)
         elif select_idx >= 0:
             self.combo.setCurrentIndex(select_idx)
+        self.combo.setToolTip(self.combo.currentData(Qt.ToolTipRole) or "")
         self.combo.blockSignals(False)
 
     def _try_auto_connect(self) -> None:
@@ -189,6 +206,9 @@ class ConnectionBar(QWidget):
     def _on_conn(self, ok: bool, reason: str) -> None:
         self.led.setOn(ok)
         self._apply_conn_style(ok)
+        # Keep the header compact: full disconnect reason goes in the tooltip
+        # (and the window status bar).
+        self.status_label.setToolTip("" if ok else reason)
         if ok:
             self.status_label.setText(f"מחובר ({reason})")
             self.btn.setText("נתק")
@@ -201,6 +221,6 @@ class ConnectionBar(QWidget):
                 # after AppState._on_link_conn has requested the state.
                 QTimer.singleShot(0, self._set_active_safe)
         else:
-            self.status_label.setText("מנותק" if not reason else f"מנותק — {reason}")
+            self.status_label.setText("מנותק")
             self.btn.setText("התחבר")
             self._auto_connect = False

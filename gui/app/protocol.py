@@ -100,6 +100,10 @@ def cmd_sw_trigger() -> dict[str, Any]:
     return {"cmd": "sw_trigger"}
 
 
+def cmd_reset_sheet_count() -> dict[str, Any]:
+    return {"cmd": "reset_sheet_count"}
+
+
 # -----------------------------------------------------------------------------
 # Program-store commands (serial mirror of the web program endpoints).
 # -----------------------------------------------------------------------------

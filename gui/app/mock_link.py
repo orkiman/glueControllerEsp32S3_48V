@@ -55,6 +55,9 @@ class MockLink(LinkBase):
         cmd = payload.get("cmd", "")
         if cmd == "ping":
             self._ack("ping")
+        elif cmd == "reset_sheet_count":
+            self._sheet_count = 0
+            self._ack("reset_sheet_count")
         elif cmd == "set_active":
             self._active = bool(payload.get("active", False))
             if self._active:

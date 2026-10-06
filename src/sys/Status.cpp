@@ -18,7 +18,8 @@ static void statusTask(void*) {
                         metrics.max_loop_gap_us,
                         metrics.max_event_late_pulses,
                         metrics.pattern_events,
-                        metrics.sheet_queue_overflows);
+                        metrics.sheet_queue_overflows,
+                        pattern::sheetCount());
         vTaskDelay(pdMS_TO_TICKS(200));   // 5 Hz
     }
 }

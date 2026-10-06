@@ -30,6 +30,9 @@ void onTestClose(uint8_t gun);
 // Software-injected photocell trigger.
 void onSwTrigger();
 
+// Zero the sheet counter reported in status (shared by PC and web).
+void onResetSheetCount();
+
 // Hard kill from fault path: drop everything, do not emit (caller emits).
 void emergencyShutdown();
 

@@ -45,13 +45,14 @@ gui/
   ui/
     theme.py                   palette + QSS loader
     styles.qss                 dark industrial theme
-    main_window.py             shell with sidebar nav
+    main_window.py             shell: header bars over tabbed screens
     widgets/
-      connection_bar.py        COM picker + status LED + ping
+      connection_bar.py        header row: run panel + status LED + COM picker
+      run_panel.py             start/stop, state, speed, sheet count (header)
+      program_bar.py           program selector / save / delete
       numeric_field.py         labelled spinbox with units
       pattern_editor.py        QGraphicsView pattern canvas (TBD)
     screens/
-      operate.py               start/stop, live status
       patterns.py              visual pattern editor host
       configure.py             per-gun currents + hold time
       admin.py                 calibration, globals, event log

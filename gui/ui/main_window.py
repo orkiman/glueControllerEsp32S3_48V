@@ -1,19 +1,18 @@
-"""Main window shell — sidebar nav + stacked screens."""
+"""Main window shell — header (run controls + connection, program bar) over
+tabbed screens."""
 from __future__ import annotations
 
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import (QFileDialog, QHBoxLayout, QListWidget,
-                               QListWidgetItem, QMainWindow, QMessageBox,
-                               QSizePolicy, QStackedWidget, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (QFileDialog, QMainWindow, QMessageBox,
+                               QSizePolicy, QTabWidget, QVBoxLayout, QWidget)
 
 from app import profiles
 from app.state import AppState
 from ui.screens.configure import ConfigureScreen
-from ui.screens.operate import OperateScreen
 from ui.screens.patterns import PatternsScreen
 from ui.widgets.connection_bar import ConnectionBar
 from ui.widgets.program_bar import ProgramBar
+from ui.widgets.run_panel import RunPanel
 
 
 class MainWindow(QMainWindow):
@@ -25,38 +24,30 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(800, 500)
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
 
-        # ---- nav sidebar ----
-        self.nav = QListWidget()
-        self.nav.setFixedWidth(180)
-        for text in ["הפעלה", "תוכנית", "הגדרות"]:
-            QListWidgetItem(text, self.nav)
-        self.nav.setCurrentRow(0)
-
         # ---- screens ----
-        self.stack = QStackedWidget()
+        self.tabs = QTabWidget()
         self.patterns_screen = PatternsScreen(state)
-        self.stack.addWidget(OperateScreen(state))
-        self.stack.addWidget(self.patterns_screen)
-        self.stack.addWidget(ConfigureScreen(state))
-        self.nav.currentRowChanged.connect(self.stack.setCurrentIndex)
+        self.tabs.addTab(self.patterns_screen, "תוכנית")
+        self.tabs.addTab(ConfigureScreen(state), "הגדרות")
 
         self._build_menu()
 
-        body = QHBoxLayout()
-        body.addWidget(self.nav)
-        body.addWidget(self.stack, 1)
-
-        # ---- program selector bar (controller-backed) ----
+        # ---- header: run controls + connection, then program bar ----
         self.program_bar = ProgramBar(state, self._refresh_from_state)
+        self.program_bar.setObjectName("ProgramBar")
 
-        # ---- top connection bar + program bar + body ----
+        body = QWidget()
+        body_lay = QVBoxLayout(body)
+        body_lay.setContentsMargins(10, 10, 10, 10)
+        body_lay.addWidget(self.tabs)
+
         root = QWidget()
         v = QVBoxLayout(root)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
-        v.addWidget(ConnectionBar(state))
+        v.addWidget(ConnectionBar(state, RunPanel(state)))
         v.addWidget(self.program_bar)
-        v.addLayout(body, 1)
+        v.addWidget(body, 1)
         self.setCentralWidget(root)
 
         # status bar shows ping/connection text

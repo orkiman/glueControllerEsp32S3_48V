@@ -40,6 +40,7 @@ struct Event {
     uint32_t u2;
     uint32_t u3;
     uint32_t u4;
+    uint32_t u5;          // Status: sheet_count
 };
 
 void init();                                  // creates queue + spawns emitter
@@ -61,6 +62,7 @@ void postPattern(uint8_t gun_1based, const cfg::GunPattern* pattern);
 void postWatchdogTimeout();
 void postStatus(float pos_mm, float speed_mm_s, bool active,
                 uint32_t maxLoopGapUs, uint32_t maxEventLatePulses,
-                uint32_t patternEvents, uint32_t sheetQueueOverflows);
+                uint32_t patternEvents, uint32_t sheetQueueOverflows,
+                uint32_t sheetCount);
 
 } // namespace evt

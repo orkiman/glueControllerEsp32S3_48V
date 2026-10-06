@@ -66,6 +66,10 @@ void onSwTrigger() {
     encoder::injectSwTrigger();
 }
 
+void onResetSheetCount() {
+    pattern::resetSheetCount();
+}
+
 void emergencyShutdown() {
     drv::killAll();
     seq::abortAll();

@@ -144,6 +144,8 @@ class AppState(QObject):
         self._send(proto.cmd_delete_program(program_id))
 
     def reset_sheet_count(self) -> None:
+        # The counter lives in the firmware; zero locally too for instant feedback.
+        self._send(proto.cmd_reset_sheet_count())
         self.status.sheet_count = 0
         self.status_changed.emit(self.status)
 

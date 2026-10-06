@@ -88,6 +88,7 @@ static void sendStatus() {
     doc["max_event_late_pulses"] = metrics.max_event_late_pulses;
     doc["pattern_events"] = metrics.pattern_events;
     doc["sheet_queue_overflows"] = metrics.sheet_queue_overflows;
+    doc["sheet_count"] = pattern::sheetCount();
     String body;
     serializeJson(doc, body);
     s_server.send(200, "application/json", body);

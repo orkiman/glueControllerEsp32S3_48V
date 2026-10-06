@@ -80,6 +80,7 @@ static std::atomic<uint32_t>  s_maxLoopGapUs{0};
 static std::atomic<uint32_t>  s_maxEventLatePulses{0};
 static std::atomic<uint32_t>  s_patternEvents{0};
 static std::atomic<uint32_t>  s_sheetQueueOverflows{0};
+static std::atomic<uint32_t>  s_sheetCount{0};      // sheets seen while active
 static_assert(std::atomic<uint32_t>::is_always_lock_free);
 
 // ---------------- helpers ----------------
@@ -228,6 +229,8 @@ void IRAM_ATTR onPhotocellEdge(uint32_t pulseAtEdge) {
 
     if (!cfg::g_sys.active.load(std::memory_order_acquire)) return;
     if ( cfg::g_sys.fault .load(std::memory_order_acquire)) return;
+
+    s_sheetCount.fetch_add(1, std::memory_order_relaxed);
 
     portENTER_CRITICAL_ISR(&s_mux);
     for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
@@ -386,6 +389,8 @@ void abortAll() {
 
 float currentPosMm()   { return pulsesToMm(encoder::pulseCount()); }
 float currentSpeedMmS(){ return s_lastSpeedMmS.load(std::memory_order_acquire); }
+uint32_t sheetCount()  { return s_sheetCount.load(std::memory_order_relaxed); }
+void resetSheetCount() { s_sheetCount.store(0, std::memory_order_relaxed); }
 Metrics metrics() {
     return {
         s_maxLoopGapUs.load(std::memory_order_relaxed),

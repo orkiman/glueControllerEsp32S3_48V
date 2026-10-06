@@ -50,4 +50,8 @@ float currentPosMm();
 float currentSpeedMmS();
 Metrics metrics();
 
+// Sheets detected by the photocell while active (not faulted).
+uint32_t sheetCount();
+void resetSheetCount();
+
 } // namespace pattern

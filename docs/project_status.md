@@ -167,6 +167,14 @@ connect and after `ready`, and never pushes its local defaults.
 The UART line limit and the web command body limit are 4096 bytes, so a full
 64-element pattern fits.
 
+### 7.1b Sheet counter
+
+- The firmware counts photocell leading edges accepted while active and not
+  faulted.  Reported as `sheet_count` in the UART `status` event and in
+  `GET /api/status`.
+- `{"cmd":"reset_sheet_count"}` zeroes it (ack `reset_sheet_count`).  The
+  GUI reset button sends this, so the count is shared by PC and web.
+
 ### 7.2 `on_timeout_ms` — per-gun, start-of-cycle
 
 Previously a global `hold_time_ms` in `RuntimeConfig` was started by
