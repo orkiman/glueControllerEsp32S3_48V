@@ -207,7 +207,8 @@ static void patternTask(void*) {
             continue;
         }
 
-        // --- speed safety: disable firing if too slow ---
+        // --- speed safety: lines only -- don't open a line if too slow.
+        //     Dots fire at any speed. ---
         bool tooSlow = s_lastSpeedMmS.load(std::memory_order_acquire) <
                        cfg::Config::active()->min_speed_mm_s;
 
@@ -241,14 +242,12 @@ static void patternTask(void*) {
                 updateMax(s_maxEventLatePulses, (uint32_t)latePulses);
                 s_patternEvents.fetch_add(1, std::memory_order_relaxed);
 
-                if (!tooSlow) {
-                    if (action == 0) {                     // dot
-                        seq::fire(g, 0);                   // on-time = pattern[g].on_timeout_ms
-                    } else if (action == 1) {              // open line
-                        seq::fire(g, 5000);                // long; closed by action 2
-                    } else if (action == 2) {              // close line
-                        seq::abort(g);
-                    }
+                if (action == 0) {                         // dot
+                    seq::fire(g, 0);                       // on-time = pattern[g].on_timeout_ms
+                } else if (action == 1) {                  // open line
+                    if (!tooSlow) seq::fire(g, 5000);      // long; closed by action 2
+                } else if (action == 2) {                  // close line (always; no-op if idle)
+                    seq::abort(g);
                 }
                 advanceInstance(g, peek, action);
                 // Write back the advanced instance.

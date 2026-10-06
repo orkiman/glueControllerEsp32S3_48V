@@ -69,8 +69,8 @@ class ConfigureScreen(QWidget):
         # always counted in hardware in parallel; this just selects which one
         # drives position tracking -- no reflash/rewiring needed to switch.
         self.cmb_encoder = QComboBox()
-        self.cmb_encoder.addItem("ראשי - 5V מהיר (GPIO40)", 0)
-        self.cmb_encoder.addItem("חלופי - 24V אופטו (GPIO5)", 1)
+        self.cmb_encoder.addItem("5V מהיר (GPIO40)", 0)
+        self.cmb_encoder.addItem("24V אופטו (GPIO5)", 1)
         self.cmb_encoder.currentIndexChanged.connect(
             lambda _i: state.push_config(
                 encoder_source=self.cmb_encoder.currentData()))

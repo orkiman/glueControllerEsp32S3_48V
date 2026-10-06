@@ -86,8 +86,9 @@ at the LM339 peak trip.  This means:
   `photocell pulse + photocell_offset_mm * pulses_per_mm`.
 - If gap between sheets < `photocell_offset_mm`, multiple sheets are tracked
   in flight on the same gun. Queue overflow drops the new trigger silently.
-- Speed-safety: if measured speed drops below `min_speed_mm_s`, the pattern
-  task suppresses firing until speed recovers.
+- Speed-safety (lines only): if measured speed is below `min_speed_mm_s`,
+  the pattern task does not open new lines.  Line closes always run.  Dots
+  fire at any speed.
 
 ---
 
@@ -176,7 +177,7 @@ and counting the **entire** Peak+Hold budget.
   (`seq::fire(g, 5000)` is hard-capped to 5 s inside `fire()`).  Line
   termination is encoder-position driven (`seq::abort(g)` at `end_mm`,
   see `PatternScheduler::patternTask`).  Speed-safety (`min_speed_mm_s`)
-  still suppresses firing entirely.
+  applies to lines only: it blocks opening a line, never closing one.
 - **No more "stuck in Peak"**: because the on-timer starts at `fire()`,
   a missing LM339 trip cannot pin IN1 HIGH indefinitely.
 
