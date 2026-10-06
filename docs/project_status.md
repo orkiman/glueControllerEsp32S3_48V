@@ -86,9 +86,16 @@ at the LM339 peak trip.  This means:
   `photocell pulse + photocell_offset_mm * pulses_per_mm`.
 - If gap between sheets < `photocell_offset_mm`, multiple sheets are tracked
   in flight on the same gun. Queue overflow drops the new trigger silently.
-- Speed-safety (lines only): if measured speed is below `min_speed_mm_s`,
-  the pattern task does not open new lines.  Line closes always run.  Dots
-  fire at any speed.
+- Speed-safety (lines only): if measured speed drops below `min_speed_mm_s`
+  inside a line, the gun is closed immediately; it re-opens if speed recovers
+  (>= 105 % of min, hysteresis) while still inside the line region.  Line
+  closes always run.  Dots fire at any speed.
+- Speed measurement (no per-pulse interrupts; PCNT count polled ~1 ms):
+  - Displayed speed: 300 ms sliding window, sampled every 10 ms.
+  - Min-speed gate: log of count changes with poll timestamps.  "Too slow"
+    when no pulse arrived for longer than one pulse period at min speed, or
+    when the upper speed bound over the last 30 ms is below min.  "Resume"
+    only when the lower bound reaches 105 % of min.  In between, state holds.
 
 ---
 
@@ -177,7 +184,8 @@ and counting the **entire** Peak+Hold budget.
   (`seq::fire(g, 5000)` is hard-capped to 5 s inside `fire()`).  Line
   termination is encoder-position driven (`seq::abort(g)` at `end_mm`,
   see `PatternScheduler::patternTask`).  Speed-safety (`min_speed_mm_s`)
-  applies to lines only: it blocks opening a line, never closing one.
+  applies to lines only: below it the line is paused (gun closed) and
+  resumed when speed recovers inside the line region.
 - **No more "stuck in Peak"**: because the on-timer starts at `fire()`,
   a missing LM339 trip cannot pin IN1 HIGH indefinitely.
 
@@ -238,6 +246,16 @@ cd gui
   passed through `peakIsr` or hit the on-timeout without it.  *Future:*
   emit a diagnostic event from `onTimerCb` if the gun was still in
   `Phase::Peak` when the timer expired.
+- **TO CHECK — lines min-speed pause/resume (added 2026-10-06, flashed but
+  NOT yet tested on the conveyor).**  See §4 speed-safety and
+  `speedGate()` in `rt/PatternScheduler.cpp`.  Test in Lines mode:
+  1. Slow below `min_speed_mm_s` mid-line -> gun must close immediately.
+  2. Full stop mid-line -> gun closes within ~one pulse period (no blob).
+  3. Speed back up while still inside the line -> gun re-opens and the line
+     finishes at `end_mm`.
+  4. Speed hovering at the limit -> no rapid on/off chatter.
+  5. Dots unaffected by min speed; GUI/web speed reading smooth (300 ms).
+  Note: `pulses_per_mm` was still 1 at the time -- calibrate first.
 
 ---
 

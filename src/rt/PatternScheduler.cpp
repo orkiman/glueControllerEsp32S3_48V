@@ -32,6 +32,14 @@ struct GunQueue {
 static GunQueue              s_q[pins::NUM_GUNS];
 static portMUX_TYPE          s_mux = portMUX_INITIALIZER_UNLOCKED;
 
+// Lines mode: gun is inside a line region but held closed because speed is
+// below min_speed_mm_s.  Re-opened when speed recovers.  patternTask-only.
+static bool                  s_linePaused[pins::NUM_GUNS] = {};
+
+// Resume threshold = min speed * this, so a speed reading hovering right at
+// the limit doesn't chatter the solenoid on/off.
+static constexpr float       RESUME_HYSTERESIS = 1.05f;
+
 // ---------------- cached config scalars ----------------
 static std::atomic<float>    s_pulsesPerMm{12.34f};
 static std::atomic<float>    s_offsetMm{250.0f};
@@ -43,6 +51,30 @@ static std::atomic<float>      s_calibPaperLen{0.0f};
 static std::atomic<uint32_t>   s_calibLeadPulse{0};
 
 // ---------------- speed estimation ----------------
+// Two independent measurements, both from polling the PCNT count in
+// patternTask (no per-pulse interrupt):
+//  - Display speed: pulses over a 300 ms sliding window, sampled every 10 ms.
+//    Smooth, shown in GUI / web.  Too laggy for the safety gate.
+//  - Safety gate (lines min speed): every count change seen by the ~1 ms poll
+//    is logged with its poll time t and the poll gap d -- the pulse happened
+//    in (t - d, t].  The gate works on guaranteed bounds from that log, so it
+//    never trips on quantisation and reacts within one pulse period.
+static constexpr uint8_t  SPEED_SAMPLES   = 30;        // x 10 ms = 300 ms
+static constexpr int64_t  SPEED_SAMPLE_US = 10000;
+static constexpr uint8_t  EDGE_LOG        = 64;
+static constexpr int64_t  GATE_WINDOW_US  = 30000;
+
+struct SpeedSample { uint32_t count; int64_t tUs; };
+struct EdgeRec     { uint32_t count; int64_t tUs; int64_t dUs; };
+
+// patternTask-only state.
+static SpeedSample s_samples[SPEED_SAMPLES + 1];
+static uint8_t     s_sampleHead = 0;         // newest
+static uint8_t     s_sampleCount = 0;
+static EdgeRec     s_edges[EDGE_LOG];
+static uint8_t     s_edgeHead = 0;           // newest
+static uint8_t     s_edgeCount = 0;
+
 static std::atomic<float>     s_lastSpeedMmS{0.0f};
 static std::atomic<uint32_t>  s_maxLoopGapUs{0};
 static std::atomic<uint32_t>  s_maxEventLatePulses{0};
@@ -67,6 +99,62 @@ static inline uint32_t mmToPulses(float mm) {
     float p = mm * ppm;
     if (p < 0.0f) p = 0.0f;
     return (uint32_t)(p + 0.5f);
+}
+
+// ---------------- speed monitoring (patternTask context) ----------------
+// Push a 300 ms-window sample and return the window's average speed (mm/s).
+static float sampleDisplaySpeed(uint32_t count, int64_t nowUs) {
+    s_sampleHead = (s_sampleHead + 1) % (SPEED_SAMPLES + 1);
+    s_samples[s_sampleHead] = { count, nowUs };
+    if (s_sampleCount < SPEED_SAMPLES + 1) s_sampleCount++;
+    if (s_sampleCount < 2) return 0.0f;
+
+    const SpeedSample& oldest =
+        s_samples[(s_sampleHead + SPEED_SAMPLES + 2 - s_sampleCount) % (SPEED_SAMPLES + 1)];
+    float sec = (float)(nowUs - oldest.tUs) * 1e-6f;
+    return (sec > 0.0f) ? pulsesToMm(count - oldest.count) / sec : 0.0f;
+}
+
+static void logEdge(uint32_t count, int64_t tUs, int64_t dUs) {
+    s_edgeHead = (s_edgeHead + 1) % EDGE_LOG;
+    s_edges[s_edgeHead] = { count, tUs, dUs };
+    if (s_edgeCount < EDGE_LOG) s_edgeCount++;
+}
+
+// Lines min-speed verdict.  Neither flag set = ambiguous (speed close to the
+// limit); the caller keeps its current state, which is the hysteresis.
+struct SpeedGate { bool tooSlow; bool canResume; };
+
+static SpeedGate speedGate(int64_t nowUs, float minSpeed) {
+    if (minSpeed <= 0.0f) return { false, true };
+    float ppm = s_pulsesPerMm.load(std::memory_order_acquire);
+    if (ppm <= 0.0f || s_edgeCount == 0) return { true, false };
+
+    const EdgeRec& newest = s_edges[s_edgeHead];
+
+    // 1) No pulse for longer than one pulse period at minSpeed: the speed is
+    //    below minSpeed right now (poll time <= true time since the pulse).
+    float gapAtMinUs = 1e6f / (ppm * minSpeed);
+    if ((float)(nowUs - newest.tUs) > gapAtMinUs) return { true, false };
+
+    // 2) Reference edge: oldest one inside the gate window, or the one just
+    //    before `newest` if the window holds only `newest`.
+    const EdgeRec* old = nullptr;
+    for (uint8_t i = 1; i < s_edgeCount; ++i) {
+        const EdgeRec& e = s_edges[(s_edgeHead + EDGE_LOG - i) % EDGE_LOG];
+        if (old && nowUs - e.tUs > GATE_WINDOW_US) break;
+        old = &e;
+    }
+    if (!old) return { false, false };
+
+    float pulses = (float)(newest.count - old->count);
+    // Upper bound on speed between the two edges -> certainly too slow?
+    float minDurUs = (float)(newest.tUs - old->tUs - newest.dUs);
+    bool  slow = minDurUs > 0.0f && pulses * 1e6f / (ppm * minDurUs) < minSpeed;
+    // Lower bound on speed from the reference edge until now -> certainly fast?
+    float maxDurUs = (float)(nowUs - old->tUs + old->dUs);
+    bool  fast = pulses * 1e6f / (ppm * maxDurUs) >= minSpeed * RESUME_HYSTERESIS;
+    return { slow, !slow && fast };
 }
 
 // Compute the absolute pulse count of the *next* event for one sheet on one gun.
@@ -178,28 +266,28 @@ void IRAM_ATTR onPhotocellFallingEdge(uint32_t pulseAtEdge) {
 
 // ---------------- PatternTask: poll events ----------------
 static void patternTask(void*) {
-    uint32_t lastPulse = 0;
-    int64_t  lastUs    = esp_timer_get_time();
-    int64_t  lastLoopUs = lastUs;
+    uint32_t lastSeen   = encoder::pulseCount();
+    int64_t  lastSampleUs = esp_timer_get_time();
+    int64_t  lastLoopUs = lastSampleUs;
     bool     wasActive = false;
 
     for (;;) {
         uint32_t now = encoder::pulseCount();
 
-        // --- speed estimate (mm/s) ---
+        // --- speed monitoring ---
         int64_t nowUs = esp_timer_get_time();
+        int64_t pollGapUs = nowUs - lastLoopUs;
         bool active = cfg::g_sys.active.load(std::memory_order_acquire);
-        if (active && wasActive) updateMax(s_maxLoopGapUs, (uint32_t)(nowUs - lastLoopUs));
+        if (active && wasActive) updateMax(s_maxLoopGapUs, (uint32_t)pollGapUs);
         lastLoopUs = nowUs;
         wasActive = active;
-        int64_t dtUs  = nowUs - lastUs;
-        if (dtUs >= 10000) {
-            uint32_t dp = now - lastPulse;
-            float mm   = pulsesToMm(dp);
-            float sec  = (float)dtUs * 1e-6f;
-            s_lastSpeedMmS.store(mm / sec, std::memory_order_release);
-            lastPulse = now;
-            lastUs    = nowUs;
+        if (now != lastSeen) {
+            logEdge(now, nowUs, pollGapUs);
+            lastSeen = now;
+        }
+        if (nowUs - lastSampleUs >= SPEED_SAMPLE_US) {
+            s_lastSpeedMmS.store(sampleDisplaySpeed(now, nowUs), std::memory_order_release);
+            lastSampleUs = nowUs;
         }
 
         if (!active) {
@@ -207,10 +295,12 @@ static void patternTask(void*) {
             continue;
         }
 
-        // --- speed safety: lines only -- don't open a line if too slow.
-        //     Dots fire at any speed. ---
-        bool tooSlow = s_lastSpeedMmS.load(std::memory_order_acquire) <
-                       cfg::Config::active()->min_speed_mm_s;
+        // --- speed safety: lines only.  Below min speed an open line is
+        //     closed immediately and re-opened if speed recovers while still
+        //     inside the line region.  Dots fire at any speed. ---
+        SpeedGate gate = speedGate(nowUs, cfg::Config::active()->min_speed_mm_s);
+        bool tooSlow   = gate.tooSlow;
+        bool canResume = gate.canResume;
 
         for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
             // Pull oldest instance for this gun (read-only peek; we may pop
@@ -220,7 +310,7 @@ static void patternTask(void*) {
             portENTER_CRITICAL(&s_mux);
             if (s_q[g].size > 0) { peek = s_q[g].ring[s_q[g].head]; have = true; }
             portEXIT_CRITICAL(&s_mux);
-            if (!have) continue;
+            if (!have) { s_linePaused[g] = false; continue; }
 
             // Drain all events for this instance that have come due, in order.
             while (have) {
@@ -245,8 +335,10 @@ static void patternTask(void*) {
                 if (action == 0) {                         // dot
                     seq::fire(g, 0);                       // on-time = pattern[g].on_timeout_ms
                 } else if (action == 1) {                  // open line
-                    if (!tooSlow) seq::fire(g, 5000);      // long; closed by action 2
+                    if (tooSlow) s_linePaused[g] = true;   // opened later if speed recovers
+                    else         seq::fire(g, 5000);       // long; closed by action 2
                 } else if (action == 2) {                  // close line (always; no-op if idle)
+                    s_linePaused[g] = false;
                     seq::abort(g);
                 }
                 advanceInstance(g, peek, action);
@@ -254,6 +346,18 @@ static void patternTask(void*) {
                 portENTER_CRITICAL(&s_mux);
                 if (s_q[g].size > 0) s_q[g].ring[s_q[g].head] = peek;
                 portEXIT_CRITICAL(&s_mux);
+            }
+
+            // Mid-line speed gating: `peek.lineOpen` means the head sheet is
+            // between start_mm and end_mm of a line on this gun.
+            if (have && peek.lineOpen) {
+                if (tooSlow) {
+                    if (!s_linePaused[g]) { seq::abort(g); s_linePaused[g] = true; }
+                } else if (s_linePaused[g] && canResume) {
+                    // fire() fails while the coil is still decaying from the
+                    // abort; stay paused and retry next tick.
+                    if (seq::fire(g, 5000)) s_linePaused[g] = false;
+                }
             }
         }
 
