@@ -216,6 +216,8 @@ static bool validateAndParse(JsonDocument& doc, cfg::RuntimeConfig& out, char* n
     if (!cfgObj["pick_current_a"].is<float>())        return false;
     float pickA = cfgObj["pick_current_a"];
     if (pickA <= 0.0f) return false;
+    // Programs saved before the limit existed load with pick capped.
+    if (pickA > cfg::MAX_PICK_CURRENT_A) pickA = cfg::MAX_PICK_CURRENT_A;
 
     if (!cfgObj["hold_current_a"].is<float>())        return false;
     float holdA = cfgObj["hold_current_a"];

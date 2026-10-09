@@ -20,6 +20,8 @@
 //   - Once the near-zero threshold is on the DAC and the comparator reads
 //     low (coil current ~0), MUX_SELECT goes LOW: between drops IN2 is held
 //     low by the ESP32, so nothing on the comparator side can drive the coil.
+//     The pick threshold then goes onto the DAC, so the next fire() normally
+//     needs no I2C write.
 //
 // Ways a drop is closed (independent of each other and of every task):
 //   1. Close alarm: hardware timer interrupt at the exact on-time end.

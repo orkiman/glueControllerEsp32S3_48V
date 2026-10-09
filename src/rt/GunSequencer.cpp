@@ -160,10 +160,14 @@ static bool IRAM_ATTR closeLocked(uint8_t g, int64_t nowUs) {
     return true;
 }
 
-// Decay done (or given up): IN2 back under ESP32 control, which holds it low.
-static void IRAM_ATTR endDecayLocked(uint8_t g) {
+// Decay done (or given up): IN2 back under ESP32 control, which holds it low,
+// and the pick threshold goes onto the DAC now, so the next fire() does not
+// have to wait for an I2C write.  Returns true: the caller kicks the DAC.
+static bool IRAM_ATTR endDecayLocked(uint8_t g) {
     drv::setMuxSelect(g, false);
     s_g[g].decaying = false;
+    dac::setTarget(g, s_g[g].cPick);
+    return true;
 }
 
 static void IRAM_ATTR noteLocked(Notes& notes, uint8_t gun1, TripReason r) {
@@ -258,15 +262,15 @@ static void IRAM_ATTR superviseDecayLocked(uint8_t g, int64_t now, bool cmpHigh,
     if (nearZero && !s.nearZeroSeen) { s.nearZeroSeen = true; s.nearZeroAtUs = now; }
     if (nearZero && !cmpHigh) {
         if (s.lowTicks < 255) s.lowTicks = s.lowTicks + 1;
-        if (s.lowTicks >= DECAY_LOW_TICKS) endDecayLocked(g);
+        if (s.lowTicks >= DECAY_LOW_TICKS) notes.kickDac |= endDecayLocked(g);
         return;
     }
     s.lowTicks = 0;
     if (nearZero && now - s.nearZeroAtUs >= DECAY_STUCK_US) {
-        endDecayLocked(g);                   // current (or the sense) stuck high
+        notes.kickDac |= endDecayLocked(g);  // current (or the sense) stuck high
         tripLocked(g, TripReason::DecayTimeout, now, notes);
     } else if (now - s.decayStartUs >= DECAY_MAX_US) {
-        endDecayLocked(g);                   // DAC write late: coast finishes the decay
+        notes.kickDac |= endDecayLocked(g);  // DAC write late: coast finishes the decay
     }
 }
 
@@ -424,11 +428,16 @@ void onConfigApplied() {
     uint16_t nz   = dac::codeForVolts(NEAR_ZERO_V);
     portENTER_CRITICAL(&s_mux);
     for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
-        s_g[g].cPick  = pick;
-        s_g[g].cHold  = hold;
-        s_g[g].cNearZ = nz;
+        GunRt& s = s_g[g];
+        s.cPick  = pick;
+        s.cHold  = hold;
+        s.cNearZ = nz;
+        // Idle guns get the (new) pick threshold now; a decaying gun gets it
+        // when its decay ends.
+        if (s.phase == Phase::Idle && !s.arming && !s.decaying) dac::setTarget(g, pick);
     }
     portEXIT_CRITICAL(&s_mux);
+    dac::kick();
 }
 
 void onActivate() {
@@ -461,7 +470,9 @@ bool fire(uint8_t g, uint32_t onMs, uint32_t* outDrop) {
 
     // The pick threshold must be on the DAC output before IN1 goes high, or
     // the LM339 trips against the old threshold and regulates at hold.
-    bool dacOk = dac::blockingSetCode(g, pick);
+    // Normally it was set when the previous drop's decay ended; otherwise
+    // (drop right after a close, config change) write it now.
+    bool dacOk = dac::isApplied(g, pick) || dac::blockingSetCode(g, pick);
 
     bool     opened = false;
     uint32_t drop   = 0;

@@ -84,6 +84,7 @@ static Result handleSetConfig(JsonDocument& doc) {
     const char* reason = nullptr;
     if      (s->pulses_per_mm  <= 0.0f)              reason = "bad_pulses_per_mm";
     else if (s->pick_current_a <= 0.0f)              reason = "bad_pick_current";
+    else if (s->pick_current_a > cfg::MAX_PICK_CURRENT_A) reason = "pick_too_high";
     else if (s->hold_current_a <= 0.0f)              reason = "bad_hold_current";
     else if (s->hold_current_a >= s->pick_current_a) reason = "hold_ge_pick";
     else if (s->encoder_source > 1)                  reason = "bad_encoder_source";

@@ -18,6 +18,11 @@ namespace cfg {
 
 constexpr size_t MAX_PATTERN_ELEMENTS_PER_GUN = 64;
 
+// Highest usable pick current.  The sense path gives 2 V/A (INA240 x50 on
+// 40 mOhm) on a 3.3 V supply, so above ~1.6 A the comparator can never trip;
+// 1.5 A keeps a margin.
+constexpr float MAX_PICK_CURRENT_A = 1.5f;
+
 struct PatternElement {
     float    start_mm;
     float    end_mm;
