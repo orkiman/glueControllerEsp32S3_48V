@@ -33,7 +33,7 @@ ROOTS = [
     "seq::peakIsr(void*)",
     "seq::onCloseAlarm()",
     "seq::onSupervisorTick()",
-    "pattern::tickHook(long*)",
+    "pattern::tickHook(int*)",
     "rttimer::closeIsr(void*)",
     "rttimer::tickIsr(void*)",
     "encoder::photocellIsr(void*)",
