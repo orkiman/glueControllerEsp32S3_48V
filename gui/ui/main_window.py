@@ -7,12 +7,23 @@ from PySide6.QtWidgets import (QFileDialog, QMainWindow, QMessageBox,
                                QSizePolicy, QTabWidget, QVBoxLayout, QWidget)
 
 from app import profiles
+from app import protocol as proto
 from app.state import AppState
 from ui.screens.configure import ConfigureScreen
 from ui.screens.patterns import PatternsScreen
 from ui.widgets.connection_bar import ConnectionBar
 from ui.widgets.program_bar import ProgramBar
 from ui.widgets.run_panel import RunPanel
+
+# Firmware safety trips: {"event":"error","cmd":"gunN"|"rt","reason":...}.
+_TRIP_TEXT = {
+    "pick_timeout":  "לא הגיע לזרם החזקה תוך 3ms — האקדח נסגר",
+    "decay_timeout": "הזרם לא ירד אחרי סגירה — האקדח נותק",
+    "close_late":    "טיפה נסגרה באיחור — נסגרה בכוח",
+    "in1_stray":     "יציאה נמצאה פתוחה בלי טיפה — נסגרה",
+    "tick_stalled":  "בקר הבטיחות נעצר והופעל מחדש",
+    "safety_stop":   "עצירת בטיחות — המכונה נעצרה אחרי תקלות חוזרות",
+}
 
 
 class MainWindow(QMainWindow):
@@ -58,6 +69,17 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("מחובר" if ok else f"מנותק — {reason}")
 
     def _on_error(self, cmd: str, reason: str) -> None:
+        trip = _TRIP_TEXT.get(reason)
+        if trip:
+            where = f"אקדח {cmd[3:]}" if cmd.startswith("gun") else "בקר"
+            # A safety stop stays on screen until the next message.
+            self.statusBar().showMessage(f"{where}: {trip}",
+                                         0 if reason == "safety_stop" else 10000)
+            return
+        if reason == "pick_too_high":
+            self.statusBar().showMessage(
+                f"שגיאה: זרם משיכה מעל {proto.MAX_PICK_CURRENT_A}A — לא נשמר", 6000)
+            return
         self.statusBar().showMessage(f"שגיאה: {cmd} → {reason}", 4000)
 
     def closeEvent(self, event) -> None:  # noqa: N802

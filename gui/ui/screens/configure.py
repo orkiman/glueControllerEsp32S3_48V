@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout,
                                QPlainTextEdit, QPushButton, QVBoxLayout,
                                QWidget)
 
+from app import protocol as proto
 from app.state import AppState, RuntimeConfig
 from ui.widgets.numeric_field import NumericField
 
@@ -28,8 +29,9 @@ class ConfigureScreen(QWidget):
         self._log_rows: list[tuple[str, dict]] = []
 
         # ---- Operation params (currents — global, all guns) ----------------
-        self.f_pick = NumericField("זרם משיכה (Pick)", "A", 0.1, 3.0, 0.05, 2)
-        self.f_hold = NumericField("זרם החזקה (Hold)", "A", 0.05, 2.5, 0.05, 2)
+        max_pick = proto.MAX_PICK_CURRENT_A
+        self.f_pick = NumericField("זרם משיכה (Pick)", "A", 0.1, max_pick, 0.05, 2)
+        self.f_hold = NumericField("זרם החזקה (Hold)", "A", 0.05, max_pick - 0.05, 0.05, 2)
         self.f_pick.bind(lambda v: state.push_config(pick_current_a=v))
         self.f_hold.bind(lambda v: state.push_config(hold_current_a=v))
 

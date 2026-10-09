@@ -13,6 +13,8 @@ from typing import Any
 
 NUM_GUNS = 4
 MAX_ELEMENTS_PER_GUN = 64
+# Firmware limit (cfg::MAX_PICK_CURRENT_A): the current sense cannot see more.
+MAX_PICK_CURRENT_A = 1.5
 
 
 class PatternType(str, Enum):
