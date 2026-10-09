@@ -6,6 +6,7 @@
 #include "config/Config.h"
 #include "hw/Pins.h"
 #include "rt/Control.h"
+#include "rt/GunSequencer.h"
 #include "rt/PatternScheduler.h"
 #include "storage/ProgramStore.h"
 
@@ -89,6 +90,11 @@ static void sendStatus() {
     doc["pattern_events"] = metrics.pattern_events;
     doc["sheet_queue_overflows"] = metrics.sheet_queue_overflows;
     doc["sheet_count"] = pattern::sheetCount();
+    // Safety trips since boot; the page shows a message when the count moves.
+    seq::TripInfo trip = seq::tripInfo();
+    doc["trips"] = trip.count;
+    doc["last_trip_gun"] = trip.gun;
+    doc["last_trip"] = seq::tripReasonName(trip.reason);
     String body;
     serializeJson(doc, body);
     s_server.send(200, "application/json", body);

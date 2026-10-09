@@ -19,11 +19,12 @@ static std::atomic<bool> s_chipReady{false};
 // fire() on the RT core) can never collide on the I2C bus with dacTask.
 static SemaphoreHandle_t s_i2cMux       = nullptr;
 
-// Shadow of the desired DAC codes for each channel.
+// Target code for each channel.
 static std::atomic<uint16_t> s_shadow[pins::NUM_GUNS];
 
-// Last codes actually written to the chip; used to skip redundant writes.
-static uint16_t s_lastWritten[pins::NUM_GUNS] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+// Codes confirmed on the chip (0xFFFF = unknown).  Written by the I2C writer,
+// read from ISRs through isApplied().
+static volatile uint16_t s_written[pins::NUM_GUNS] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
 
 static inline uint16_t voltsToCode(float v) {
     if (v <= 0.0f)  return 0;
@@ -36,12 +37,13 @@ static inline uint16_t voltsToCode(float v) {
 
 uint16_t codeForVolts(float v) { return voltsToCode(v); }
 
-// Pure integer path -- safe from ANY context (task or ISR).  No FPU use.
-void IRAM_ATTR requestCode(uint8_t g, uint16_t code) {
+void IRAM_ATTR setTarget(uint8_t g, uint16_t code) {
     if (g >= pins::NUM_GUNS) return;
     s_shadow[g].store(code, std::memory_order_release);
-    if (!s_task) return;
+}
 
+void IRAM_ATTR kick() {
+    if (!s_task) return;
     if (xPortInIsrContext()) {
         BaseType_t hp = pdFALSE;
         vTaskNotifyGiveFromISR(s_task, &hp);
@@ -51,49 +53,43 @@ void IRAM_ATTR requestCode(uint8_t g, uint16_t code) {
     }
 }
 
-// TASK CONTEXT ONLY: voltsToCode() uses the FPU, which is unavailable in ISRs.
-void requestThreshold(uint8_t g, float v) {
-    requestCode(g, voltsToCode(v));
+bool IRAM_ATTR isApplied(uint8_t g, uint16_t code) {
+    if (g >= pins::NUM_GUNS) return false;
+    return s_shadow[g].load(std::memory_order_acquire) == code && s_written[g] == code;
 }
 
-static void writeAllChannels() {
-    if (!s_chipReady.load(std::memory_order_acquire)) return;
+// Write every channel whose target differs from the chip.  Task context only.
+static bool writeAllChannels() {
+    if (!s_chipReady.load(std::memory_order_acquire)) return false;
 
-    // Serialize with any other context touching the chip (dacTask vs the
-    // synchronous blockingSetCode() called from fire()).  Must only be called
-    // from task context -- never an ISR.
     if (s_i2cMux) xSemaphoreTake(s_i2cMux, portMAX_DELAY);
 
     uint16_t snap[pins::NUM_GUNS];
     bool dirty = false;
     for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
         snap[g] = s_shadow[g].load(std::memory_order_acquire);
-        if (snap[g] != s_lastWritten[g]) dirty = true;
+        if (snap[g] != s_written[g]) dirty = true;
     }
+    bool ok = true;
     if (dirty) {
         // fastWrite uses Vref=VDD, gain=1, normal mode for all channels in one I2C txn.
-        bool ok = s_chip.fastWrite(snap[0], snap[1], snap[2], snap[3]);
+        ok = s_chip.fastWrite(snap[0], snap[1], snap[2], snap[3]);
         if (ok) {
-            for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) s_lastWritten[g] = snap[g];
+            for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) s_written[g] = snap[g];
         } else {
             evt::postError("dac", "i2c_write_failed");
         }
     }
 
     if (s_i2cMux) xSemaphoreGive(s_i2cMux);
+    return ok;
 }
 
-// TASK CONTEXT ONLY: set one channel's code and push it to the chip
-// synchronously (blocking I2C).  fire() uses this to guarantee the pick
-// threshold is physically present on the DAC output *before* the coil is
-// energised -- otherwise the comparator would trip against the stale
-// (near-zero) threshold from the previous cycle and we'd regulate at hold
-// current immediately, making the pick-current setting look like it does
-// nothing.
-void blockingSetCode(uint8_t g, uint16_t code) {
-    if (g >= pins::NUM_GUNS) return;
-    s_shadow[g].store(code, std::memory_order_release);
+bool blockingSetCode(uint8_t g, uint16_t code) {
+    if (g >= pins::NUM_GUNS) return false;
+    setTarget(g, code);
     writeAllChannels();
+    return isApplied(g, code);
 }
 
 static void dacTask(void*) {
@@ -123,6 +119,7 @@ bool init() {
                                MCP4728_GAIN_1X,
                                MCP4728_PD_MODE_NORMAL,
                                false /*udac*/);
+        s_written[ch] = 0;
     }
     s_chipReady.store(true, std::memory_order_release);
 
@@ -130,8 +127,8 @@ bool init() {
     return true;
 }
 
-void blockingZeroAll() {
-    for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) s_shadow[g].store(0);
+void blockingSafeAll() {
+    for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) setTarget(g, SAFE_CODE);
     writeAllChannels();
 }
 

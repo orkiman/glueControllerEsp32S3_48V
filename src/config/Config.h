@@ -68,10 +68,12 @@ public:
     static const RuntimeConfig* active();        // hot-path read (IRAM-safe)
     static RuntimeConfig*       editScratch();   // cold-path write target
     static void publish();                       // atomic swap of active pointer
+    static uint32_t generation();                // incremented by every publish()
 
 private:
     static RuntimeConfig             buf_[2];
     static std::atomic<uint8_t>      activeIdx_;
+    static std::atomic<uint32_t>     generation_;
 };
 
 // ---- Runtime/system state (separate from config) ----

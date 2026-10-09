@@ -35,10 +35,20 @@ static portMUX_TYPE          s_mux = portMUX_INITIALIZER_UNLOCKED;
 // Lines mode: gun is inside a line region but held closed because speed is
 // below min_speed_mm_s.  Re-opened when speed recovers.  patternTask-only.
 static bool                  s_linePaused[pins::NUM_GUNS] = {};
+// Drop id of the line this task has open on each gun (0 = none).
+// patternTask-only.
+static uint32_t              s_lineDrop[pins::NUM_GUNS] = {};
 
 // Resume threshold = min speed * this, so a speed reading hovering right at
 // the limit doesn't chatter the solenoid on/off.
 static constexpr float       RESUME_HYSTERESIS = 1.05f;
+// With min speed off (0), a line still closes when no encoder pulse arrived
+// for this long: a standing conveyor must not get a puddle.
+static constexpr int64_t     STOPPED_US = 200000;
+
+// Last pattern seen per gun, to detect edits.  patternTask-only.
+static uint32_t              s_seenGeneration = 0;
+static cfg::GunPattern       s_seenPattern[pins::NUM_GUNS];
 
 // ---------------- cached config scalars ----------------
 static std::atomic<float>    s_pulsesPerMm{12.34f};
@@ -129,7 +139,10 @@ static void logEdge(uint32_t count, int64_t tUs, int64_t dUs) {
 struct SpeedGate { bool tooSlow; bool canResume; };
 
 static SpeedGate speedGate(int64_t nowUs, float minSpeed) {
-    if (minSpeed <= 0.0f) return { false, true };
+    if (minSpeed <= 0.0f) {
+        bool stopped = s_edgeCount == 0 || nowUs - s_edges[s_edgeHead].tUs > STOPPED_US;
+        return { stopped, !stopped };
+    }
     float ppm = s_pulsesPerMm.load(std::memory_order_acquire);
     if (ppm <= 0.0f || s_edgeCount == 0) return { true, false };
 
@@ -273,12 +286,158 @@ static void finishCalibration() {
     evt::postCalibResult(ppm);
 }
 
-// ---------------- PatternTask: poll events ----------------
+// ---------------- sheet queue access (patternTask) ----------------
+static bool headOf(uint8_t g, SheetGunInstance& out) {
+    portENTER_CRITICAL(&s_mux);
+    bool have = s_q[g].size > 0;
+    if (have) out = s_q[g].ring[s_q[g].head];
+    portEXIT_CRITICAL(&s_mux);
+    return have;
+}
+
+// Pop the head instance; returns the new head, if any.
+static bool popHead(uint8_t g, SheetGunInstance& out) {
+    portENTER_CRITICAL(&s_mux);
+    if (s_q[g].size > 0) {
+        s_q[g].head = (s_q[g].head + 1) % SHEET_QUEUE_DEPTH;
+        s_q[g].size--;
+    }
+    bool more = s_q[g].size > 0;
+    if (more) out = s_q[g].ring[s_q[g].head];
+    portEXIT_CRITICAL(&s_mux);
+    return more;
+}
+
+static void writeBackHead(uint8_t g, const SheetGunInstance& inst) {
+    portENTER_CRITICAL(&s_mux);
+    if (s_q[g].size > 0) s_q[g].ring[s_q[g].head] = inst;
+    portEXIT_CRITICAL(&s_mux);
+}
+
+// ---------------- lines (patternTask) ----------------
+// Long on-time for a line: it is closed by position; this is only the ceiling.
+static constexpr uint32_t LINE_CEILING_MS = 5000;
+
+static bool openLine(uint8_t g) {
+    uint32_t drop = 0;
+    if (!seq::fire(g, LINE_CEILING_MS, &drop)) return false;
+    s_lineDrop[g] = drop;
+    return true;
+}
+
+// Close the line this task opened on gun g (no-op if none is open).
+static void closeLine(uint8_t g) {
+    if (s_lineDrop[g]) seq::closeIfDrop(g, s_lineDrop[g]);
+    s_lineDrop[g] = 0;
+}
+
+static void endLine(uint8_t g) {
+    closeLine(g);
+    s_linePaused[g] = false;
+}
+
+// Encoder pulse where the line the instance is in ends.
+static uint32_t lineEndPulse(uint8_t g, const SheetGunInstance& s) {
+    const cfg::GunPattern& gp = cfg::Config::active()->pattern[g];
+    float ppm    = s_pulsesPerMm.load(std::memory_order_acquire);
+    float offset = s_offsetMm.load   (std::memory_order_acquire);
+    uint32_t base = s.edgePulse + (uint32_t)(offset * ppm + 0.5f);
+    return base + (uint32_t)(gp.elems[s.elemIdx].end_mm * ppm + 0.5f);
+}
+
+// Drop gun g's in-flight sheets and close a line it has open.
+static void resetGun(uint8_t g) {
+    endLine(g);
+    portENTER_CRITICAL(&s_mux);
+    s_q[g].head = 0;
+    s_q[g].size = 0;
+    portEXIT_CRITICAL(&s_mux);
+}
+
+// ---------------- pattern edits (patternTask) ----------------
+static bool sameGeometry(const cfg::GunPattern& a, const cfg::GunPattern& b) {
+    if (a.type != b.type || a.count != b.count) return false;
+    for (uint8_t i = 0; i < a.count; ++i) {
+        if (a.elems[i].start_mm   != b.elems[i].start_mm ||
+            a.elems[i].end_mm     != b.elems[i].end_mm   ||
+            a.elems[i].spacing_mm != b.elems[i].spacing_mm) return false;
+    }
+    return true;
+}
+
+static void rememberPatterns() {
+    s_seenGeneration = cfg::Config::generation();
+    const cfg::RuntimeConfig* c = cfg::Config::active();
+    for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) s_seenPattern[g] = c->pattern[g];
+}
+
+// A gun whose pattern shape changed starts over from the next sheet: its
+// in-flight sheets were planned with the old shape (and an open line would
+// have lost its close).  An on-time-only change keeps running.
+static void checkPatternEdits() {
+    if (cfg::Config::generation() == s_seenGeneration) return;
+    s_seenGeneration = cfg::Config::generation();
+    const cfg::RuntimeConfig* c = cfg::Config::active();
+    for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
+        if (!sameGeometry(c->pattern[g], s_seenPattern[g])) resetGun(g);
+        s_seenPattern[g] = c->pattern[g];
+    }
+}
+
+// ---------------- PatternTask ----------------
+// Fire every event of gun g's head sheet that has come due, then run the
+// lines min-speed gate.
+static void serviceGun(uint8_t g, uint32_t now, const SpeedGate& gate) {
+    SheetGunInstance peek;
+    bool have = headOf(g, peek);
+    if (!have) { endLine(g); return; }
+
+    while (have) {
+        uint32_t evPulse;
+        uint8_t  action;
+        if (!nextEventPulse(g, peek, evPulse, action)) {
+            // Sheet done on this gun.  A line still open here lost its close
+            // to a pattern change: close it now.
+            if (peek.lineOpen) endLine(g);
+            have = popHead(g, peek);
+            continue;
+        }
+        int32_t latePulses = (int32_t)(now - evPulse);
+        if (latePulses < 0) break;               // not due yet
+        updateMax(s_maxEventLatePulses, (uint32_t)latePulses);
+        s_patternEvents.fetch_add(1, std::memory_order_relaxed);
+
+        if (action == 0) {                       // dot (ignored while the gun is still open)
+            seq::fire(g, 0);                     // on-time = pattern[g].on_timeout_ms
+        } else if (action == 1) {                // open line; retried below if it cannot open now
+            s_linePaused[g] = gate.tooSlow || !openLine(g);
+        } else {                                 // close line
+            endLine(g);
+        }
+        advanceInstance(g, peek, action);
+        writeBackHead(g, peek);
+    }
+
+    // Lines speed gate.  `peek.lineOpen`: the head sheet is between start_mm
+    // and end_mm of a line on this gun.  Below min speed the gun closes at
+    // once; it re-opens when speed recovers while still inside the line.
+    if (have && peek.lineOpen) {
+        if (gate.tooSlow) {
+            if (!s_linePaused[g]) { closeLine(g); s_linePaused[g] = true; }
+        } else if (s_linePaused[g] && gate.canResume &&
+                   (int32_t)(lineEndPulse(g, peek) - encoder::pulseCount()) > 0) {
+            // fire() fails while the gun is still busy; retry next tick.
+            if (openLine(g)) s_linePaused[g] = false;
+        }
+    }
+}
+
 static void patternTask(void*) {
-    uint32_t lastSeen   = encoder::pulseCount();
+    uint32_t lastSeen     = encoder::pulseCount();
     int64_t  lastSampleUs = esp_timer_get_time();
-    int64_t  lastLoopUs = lastSampleUs;
-    bool     wasActive = false;
+    int64_t  lastLoopUs   = lastSampleUs;
+    bool     wasActive    = false;
+    rememberPatterns();
 
     for (;;) {
         uint32_t now = encoder::pulseCount();
@@ -286,7 +445,8 @@ static void patternTask(void*) {
         // --- speed monitoring ---
         int64_t nowUs = esp_timer_get_time();
         int64_t pollGapUs = nowUs - lastLoopUs;
-        bool active = cfg::g_sys.active.load(std::memory_order_acquire);
+        bool active  = cfg::g_sys.active.load(std::memory_order_acquire);
+        bool stopped = wasActive && !active;
         if (active && wasActive) updateMax(s_maxLoopGapUs, (uint32_t)pollGapUs);
         lastLoopUs = nowUs;
         wasActive = active;
@@ -301,77 +461,18 @@ static void patternTask(void*) {
         if (s_calibDone.exchange(false, std::memory_order_acq_rel)) finishCalibration();
 
         if (!active) {
+            // Stopped (command, watchdog, fault, safety stop): nothing in
+            // flight survives into the next run.
+            if (stopped) for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) resetGun(g);
             vTaskDelay(pdMS_TO_TICKS(5));
             continue;
         }
 
-        // --- speed safety: lines only.  Below min speed an open line is
-        //     closed immediately and re-opened if speed recovers while still
-        //     inside the line region.  Dots fire at any speed. ---
+        checkPatternEdits();
         SpeedGate gate = speedGate(nowUs, cfg::Config::active()->min_speed_mm_s);
-        bool tooSlow   = gate.tooSlow;
-        bool canResume = gate.canResume;
+        for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) serviceGun(g, now, gate);
 
-        for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
-            // Pull oldest instance for this gun (read-only peek; we may pop
-            // after firing under the spinlock).
-            SheetGunInstance peek;
-            bool have = false;
-            portENTER_CRITICAL(&s_mux);
-            if (s_q[g].size > 0) { peek = s_q[g].ring[s_q[g].head]; have = true; }
-            portEXIT_CRITICAL(&s_mux);
-            if (!have) { s_linePaused[g] = false; continue; }
-
-            // Drain all events for this instance that have come due, in order.
-            while (have) {
-                uint32_t evPulse;
-                uint8_t  action;
-                if (!nextEventPulse(g, peek, evPulse, action)) {
-                    // Instance has no more events -> pop and check next.
-                    portENTER_CRITICAL(&s_mux);
-                    s_q[g].head = (s_q[g].head + 1) % SHEET_QUEUE_DEPTH;
-                    s_q[g].size--;
-                    bool more = s_q[g].size > 0;
-                    if (more) peek = s_q[g].ring[s_q[g].head];
-                    portEXIT_CRITICAL(&s_mux);
-                    have = more;
-                    continue;
-                }
-                int32_t latePulses = (int32_t)(now - evPulse);
-                if (latePulses < 0) break;   // not due yet
-                updateMax(s_maxEventLatePulses, (uint32_t)latePulses);
-                s_patternEvents.fetch_add(1, std::memory_order_relaxed);
-
-                if (action == 0) {                         // dot
-                    seq::fire(g, 0);                       // on-time = pattern[g].on_timeout_ms
-                } else if (action == 1) {                  // open line
-                    if (tooSlow) s_linePaused[g] = true;   // opened later if speed recovers
-                    else         seq::fire(g, 5000);       // long; closed by action 2
-                } else if (action == 2) {                  // close line (always; no-op if idle)
-                    s_linePaused[g] = false;
-                    seq::abort(g);
-                }
-                advanceInstance(g, peek, action);
-                // Write back the advanced instance.
-                portENTER_CRITICAL(&s_mux);
-                if (s_q[g].size > 0) s_q[g].ring[s_q[g].head] = peek;
-                portEXIT_CRITICAL(&s_mux);
-            }
-
-            // Mid-line speed gating: `peek.lineOpen` means the head sheet is
-            // between start_mm and end_mm of a line on this gun.
-            if (have && peek.lineOpen) {
-                if (tooSlow) {
-                    if (!s_linePaused[g]) { seq::abort(g); s_linePaused[g] = true; }
-                } else if (s_linePaused[g] && canResume) {
-                    // fire() fails while the coil is still decaying from the
-                    // abort; stay paused and retry next tick.
-                    if (seq::fire(g, 5000)) s_linePaused[g] = false;
-                }
-            }
-        }
-
-        vTaskDelay(1);     // ~1 ms tick on Core 1.  Plenty for 330 Hz droplets.
+        vTaskDelay(1);     // ~1 ms tick on Core 1.
     }
 }
 

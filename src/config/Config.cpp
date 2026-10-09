@@ -4,6 +4,7 @@ namespace cfg {
 
 RuntimeConfig             Config::buf_[2];
 std::atomic<uint8_t>      Config::activeIdx_{0};
+std::atomic<uint32_t>     Config::generation_{0};
 
 SystemState g_sys;
 
@@ -30,6 +31,11 @@ RuntimeConfig* Config::editScratch() {
 void Config::publish() {
     uint8_t inactive = activeIdx_.load(std::memory_order_acquire) ^ 1u;
     activeIdx_.store(inactive, std::memory_order_release);
+    generation_.fetch_add(1, std::memory_order_acq_rel);
+}
+
+uint32_t Config::generation() {
+    return generation_.load(std::memory_order_acquire);
 }
 
 } // namespace cfg

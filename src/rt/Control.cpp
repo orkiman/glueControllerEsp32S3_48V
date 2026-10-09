@@ -17,6 +17,7 @@ void onSetActive(bool active) {
         // the fault latch by issuing set_active:true (see UartJson).
         pattern::onConfigApplied();
         seq::onConfigApplied();
+        seq::onActivate();
     } else {
         // Hard abort: flush sheet queues, stop tests, abort in-flight sequences.
         testrun::stopAll();
@@ -74,7 +75,7 @@ void emergencyShutdown() {
     drv::killAll();
     seq::abortAll();
     pattern::abortAll();
-    dac::blockingZeroAll();
+    dac::blockingSafeAll();
 }
 
 } // namespace rt
