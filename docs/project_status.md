@@ -4,9 +4,9 @@
 > The original spec lives in `initial prompt.md` and should not be edited;
 > this file records any decisions, deltas, and the current state.
 
-Last updated: Jun 2026. Stage 2 GUI feature-complete (mock-verified).
-Per-gun `on_timeout_ms`, multi-program management, event log filtering,
-dynamic canvas, and overlap prevention all landed.
+Last updated: Oct 2026. Real-time safety supervisor (hardware close timer,
+pick limit, safety trips), drops fired on the exact encoder pulse, DAC pick
+pre-arm.  Not yet run on the machine -- see §9 checklist.
 
 ---
 
@@ -35,8 +35,11 @@ embedded HMI later is a drop-in.
 | 0    | `evt_emit`  | 5    | `comms/Events.cpp`                | Drains lock-free event queue -> Serial |
 | 0    | `wdog`      | 3    | `sys/Watchdog.cpp`                | HMI link timeout (2 s)                 |
 | 0    | `status`    | 2    | `sys/Status.cpp`                  | 5 Hz `{"event":"status"}`              |
-| 1    | `pattern`   | 7    | `rt/PatternScheduler.cpp`         | Encoder poll + fire pattern events     |
-| 1    | `dac`       | 6    | `hw/Dac.cpp`                      | Coalesced MCP4728 I2C writes           |
+| 0    | `rt_check` (esp_timer, 1 ms) | 22 | `rt/GunSequencer.cpp`   | Last-resort close, IN1 readback, supervisor watchdog, peak diag events |
+| 1    | `pattern`   | 7    | `rt/PatternScheduler.cpp`         | Fires pattern events; woken by the supervisor at the due pulse |
+| 1    | `dac`       | 6    | `hw/Dac.cpp`                      | MCP4728 I2C writes (changed channels only) |
+| 1    | Close alarm (TIMERG0 T0) | IRAM | `hw/RtTimers`, `rt/GunSequencer` | Drop end at the exact on-time |
+| 1    | Supervisor (TIMERG1 T0, 50 us) | IRAM | `hw/RtTimers`, `rt/GunSequencer`, `rt/PatternScheduler` | Safety checks, due-pulse wake-up, line ends |
 | 1    | ISRs        | IRAM | `hw/Encoder`, `rt/GunSequencer`, `sys/Fault` | Peak (x4), photocell, nFAULT, PCNT overflow |
 
 ### Key isolation rules (enforced by file layout)
@@ -54,8 +57,14 @@ embedded HMI later is a drop-in.
   `.rodata` -> `DRAM_ATTR`), and no FPU.  Violations crash with
   *"Cache disabled but cached memory region accessed"* a few seconds after a
   settings change, and the controller reboots inactive (seen 2026-10-06,
-  fixed).  To check: disassemble the IRAM functions and flag any call or
-  `l32r` literal pointing into 0x42xxxxxx / 0x3Cxxxxxx.
+  fixed).  To check after every firmware change: `py tools/check_isr_iram.py`
+  (walks everything reachable from the interrupts in the built ELF and
+  fails on any call or `l32r` literal pointing into 0x42xxxxxx / 0x3Cxxxxxx).
+  Avoid in interrupt code: sub-word `std::atomic` read-modify-write (libcall),
+  `switch` jump tables, 64-bit division.
+- During a flash write Core 1 tasks stop (Core 1 spins in an IPC task); only
+  IRAM interrupts run.  That is why drop ends, line ends and every safety
+  check run in the timer interrupts, not in tasks.
 
 ---
 
@@ -63,27 +72,66 @@ embedded HMI later is a drop-in.
 
 | Phase                | Trigger                          | File / function                                          |
 | -------------------- | -------------------------------- | -------------------------------------------------------- |
-| 1 Peak / Pick        | `seq::fire(g)`                   | `rt/GunSequencer.cpp :: fire()`                          |
+| 1 Peak / Pick        | `seq::fire(g)` (task only)       | `rt/GunSequencer.cpp :: fire()`                          |
 | 2 Hold (chopping)    | LM339 peak IRQ                   | `rt/GunSequencer.cpp :: peakIsr()`                       |
-| 3 Active Fast Decay  | on-timer expiry OR `seq::abort()`| `rt/GunSequencer.cpp :: onTimerCb() / abort()`           |
+| 3 Close / decay      | close alarm, line end, `abort()`, safety trip | `rt/GunSequencer.cpp :: closeLocked()`      |
 
-Per-gun state machine is `Idle -> Peak -> Hold -> Decay -> Idle`, guarded
-by a `compare_exchange_strong` so `fire()` is safe from any context.
+Per-gun state `Idle -> Peak -> Hold -> Idle` (IN1 high exactly while not
+Idle), plus a `decaying` flag after a close.  All transitions happen under
+one spinlock, so the interrupts, the pattern task (Core 1) and Core 0
+callers (stop, watchdog, test runner) see a consistent state.
 
-### On-timer (Peak+Hold budget)
+- **fire()**: refuses while the gun is still open -- a new drop that comes
+  before the previous one closed is ignored.  Needs the pick threshold on
+  the DAC (normally pre-armed, else written over I2C first; refuses if that
+  fails).  Arms the close **before** IN1 goes high, then MUX_SELECT=1, peak
+  IRQ on, IN1=1.  Returns a drop id.
+- **On-time** (`on_timeout_ms`, or the caller's value for lines/tests)
+  counts from fire(), not from the peak trip.  If it ends before the peak,
+  the gun closes (normal for short dots).
+- **Close**: IN1=0, DAC -> near-zero (0.1 V = 0.05 A).  MUX_SELECT stays 1
+  so the LM339 reverse-drives the coil to ~0 A, as before.  When the
+  supervisor sees near-zero confirmed on the DAC and the comparator low for
+  2 ticks, MUX_SELECT goes 0 (IN2 held low by the ESP32 between drops) and
+  the pick threshold is pre-armed on the DAC for the next drop.
+- **Ways a drop closes** (independent): close alarm interrupt at the exact
+  end; supervisor 100 us after the end; Core 0 `rt_check` 2 ms after.
 
-`fire()` arms a single `esp_timer` (`onTimer`, per gun) for the full
-per-gun `on_timeout_ms` budget, starting **at the moment of fire()**, not
-at the LM339 peak trip.  This means:
+### 3a. Safety supervisor (50 us, interrupt, Core 1)
 
-- Normal flow: LM339 -> `peakIsr` -> Hold phase; the same timer keeps
-  counting and forces Phase 3 when the budget expires.
-- Fault flow: if the peak trip never arrives (open coil, broken sense,
-  wrong threshold), the same timer still fires, drops the gun into
-  Phase 3, and masks the late IRQ defensively.  No more "stuck in Peak"
-  failure mode.
-- `seq::abort(g)` stops the on-timer and force-enters Phase 3 (used by
-  Lines to terminate at the encoder-position end of the line).
+| Check | Action | Reported reason |
+| ----- | ------ | --------------- |
+| Drop still open 100 us after its end (close alarm missed) | close | `close_late` |
+| Hold threshold not confirmed on the DAC 3 ms after opening (missed peak trip, dead sense, failed/late I2C) | close | `pick_timeout` |
+| IN1 high with no open drop (readback) | force low | `in1_stray` |
+| Near-zero on the DAC, comparator still high 2 ms later | MUX_SELECT=0 | `decay_timeout` |
+| Near-zero never confirmed within 5 ms of the close (DAC late) | MUX_SELECT=0 (coast) | -- |
+| Supervisor tick stopped (checked by `rt_check`) | restart it | `tick_stalled` (cmd `rt`) |
+
+Each trip is `{"event":"error","cmd":"gunN","reason":...}`.  Three trips in
+a row on one gun (no good drop in between, < 60 s apart) stop the machine
+like a stop command: `{"event":"error","cmd":"gunN","reason":"safety_stop"}`.
+`set_active:true` clears the streaks.  `/api/status` reports `trips`,
+`last_trip_gun`, `last_trip`; the GUI status bar and the web page show them.
+
+Remaining limit: with dots, a dead current sense cannot be detected ("no
+peak" is normal for short dots), so each dot runs up to its on-time
+unregulated -- the DRV8262's own limit (VREF 3.3 V, IPROPI 5.1 k ->
+ITRIP ~3 A) still caps the current.
+
+### 3b. DAC
+
+- Only changed channels are written: Multi-Write for 1-2 channels (4 / 7
+  bytes), Fast Write for 3-4 (8 bytes), 400 kHz.  `isApplied()` reports
+  what is confirmed on the chip.  Failed writes retry at once and then every
+  tick; `i2c_write_failed` at most once per second.
+- The chip EEPROM (loaded at power-up) holds 0.10 V on every channel (set
+  once at boot if different), so at power-up the comparators read "no
+  current".  The MUX select / IN0 lines have no pull-downs on the board and
+  float until the firmware starts; this covers a MUX that floats to the
+  comparator side (gun 4's select, GPIO48, has a weak pull-up at reset).
+- Pick current max 1.5 A (`cfg::MAX_PICK_CURRENT_A`): the sense gives 2 V/A
+  on a 3.3 V supply, so above ~1.6 A the comparator can never trip.
 
 ---
 
@@ -96,10 +144,21 @@ at the LM339 peak trip.  This means:
   `photocell pulse + photocell_offset_mm * pulses_per_mm`.
 - If gap between sheets < `photocell_offset_mm`, multiple sheets are tracked
   in flight on the same gun. Queue overflow drops the new trigger silently.
+- Timing: the pattern task publishes each gun's next due pulse; the 50 us
+  supervisor tick wakes it when the encoder reaches it (was: polled once per
+  1 ms tick).  A line's end pulse is armed when it opens and the supervisor
+  closes the gun there itself.  The task still runs every 1 ms for the speed
+  gate and display.
 - Speed-safety (lines only): if measured speed drops below `min_speed_mm_s`
   inside a line, the gun is closed immediately; it re-opens if speed recovers
   (>= 105 % of min, hysteresis) while still inside the line region.  Line
-  closes always run.  Dots fire at any speed.
+  closes always run.  Dots fire at any speed.  With `min_speed_mm_s` = 0 a
+  line still closes when no encoder pulse arrived for 200 ms (conveyor
+  stopped) and re-opens when it moves.
+- A pattern **shape** change on a gun (type / elements) drops that gun's
+  in-flight sheets and closes its line; it restarts from the next sheet.
+  On-time-only changes keep running.  Stop / watchdog / fault / safety stop
+  flush every in-flight sheet.
 - Speed measurement (no per-pulse interrupts; PCNT count polled ~1 ms):
   - Displayed speed: 300 ms sliding window, sampled every 10 ms.
   - Min-speed gate: log of count changes with poll timestamps.  "Too slow"
@@ -136,6 +195,12 @@ currently configured pattern type (see `rt/TestRunner.cpp`):
   page's `/api/control/heartbeat` (sent every 500 ms while the page is
   visible) refresh the timestamp. After 2 s of silence from both while
   active, outputs are killed and `{"event":"watchdog_timeout"}` is emitted.
+- **Safety supervisor**: see §3a.
+- **Boot window**: from reset until `drv::init()` the ESP32 pins float.  IN1
+  lines are held low by the DRV8262's internal 200 k pull-downs; IN2 comes
+  from the MUX whose select / IN0 inputs have no pull-downs.  The DAC EEPROM
+  value (§3b) covers the comparator side; a full fix needs pull-downs on the
+  MUX_x_SELECT / MUX_x_IN0 lines (next board revision).
 
 ---
 
@@ -147,6 +212,9 @@ currently configured pattern type (see `rt/TestRunner.cpp`):
 | -------------- | ----------------------- | ------------------------------------------------------- |
 | `test_open`    | `no_pattern_or_busy`    | Gun has no pattern, or a test is already running on it. |
 | `set_pattern`  | `bad_on_timeout`        | `on_timeout_ms` was supplied but ≤ 0.                   |
+| `set_config`   | `pick_too_high`         | `pick_current_a` above 1.5 A.                           |
+| `gun1`..`gun4`, `rt` | `pick_timeout`, `decay_timeout`, `close_late`, `in1_stray`, `tick_stalled`, `safety_stop` | Safety trips, see §3a. |
+| `dac`          | `i2c_write_failed`, `eeprom_*_failed`, `init_failed` | DAC problems.                          |
 
 All other validation errors (`bad_pulses_per_mm`, `hold_ge_pick`, etc.) are
 sanity checks in `set_config` / `set_pattern`.
@@ -198,14 +266,13 @@ and counting the **entire** Peak+Hold budget.
   active buffer).
 - Default per-gun value at boot: **1.2 ms**.
 - **Dots mode**: `on_timeout_ms` is the user-facing droplet on-time.
-- **Lines mode**: `on_timeout_ms` is used only as a long safety ceiling
-  (`seq::fire(g, 5000)` is hard-capped to 5 s inside `fire()`).  Line
-  termination is encoder-position driven (`seq::abort(g)` at `end_mm`,
-  see `PatternScheduler::patternTask`).  Speed-safety (`min_speed_mm_s`)
+- **Lines mode**: `on_timeout_ms` is not used; a line opens with a 5 s
+  ceiling (`LINE_CEILING_MS`) and is closed by encoder position at `end_mm`
+  (supervisor tick, `seq::closeIfDrop`).  Speed-safety (`min_speed_mm_s`)
   applies to lines only: below it the line is paused (gun closed) and
   resumed when speed recovers inside the line region.
-- **No more "stuck in Peak"**: because the on-timer starts at `fire()`,
-  a missing LM339 trip cannot pin IN1 HIGH indefinitely.
+- **No "stuck in Peak"**: the on-time counts from `fire()`, and the 3 ms
+  pick limit (§3a) closes a line whose hold threshold is not confirmed.
 
 Example payload:
 
@@ -254,16 +321,26 @@ cd gui
 
 ## 9. Open Items For Bench Bring-Up
 
-- **`Adafruit_MCP4728::fastWrite` signature** — assumed `(uint16_t, uint16_t, uint16_t, uint16_t)` returning `bool`; will fail at compile if the installed lib differs.
 - **PCNT glitch filter** at 100 APB ticks (~1.25 µs). Will tune once we see the 6N137's real edge behaviour on the scope.
 - **`NEAR_ZERO_V = 0.10 V`** Phase-3 termination threshold. Tunable in `rt/GunSequencer.cpp`. Right now corresponds to ~0.05 A coil current.
-- **On-timer dispatch via `esp_timer` task context** (not ISR). Worst-case latency ~50 µs; fine for on-times ≥ 1 ms but introduces jitter if `on_timeout_ms` is set absurdly small.
-- **No `error` event yet for the "peak trip never arrived" case** — the
-  on-timer correctly drops the gun into Phase 3 (no stuck-in-Peak any
-  more), but we still can't tell from outside whether a given fire cycle
-  passed through `peakIsr` or hit the on-timeout without it.  *Future:*
-  emit a diagnostic event from `onTimerCb` if the gun was still in
-  `Phase::Peak` when the timer expired.
+- **Peak diagnostics**: during `test_open` each drop reports a `debug` event
+  `peak` (us to the LM339 trip) or `nopeak`.
+- **TO CHECK — real-time / safety rework (2026-10-09, built, IRAM check
+  clean, NOT yet run on the machine).**  Flash, then:
+  1. Boot: no `error` events (`dac eeprom_*`, `rt timer_init_failed`); the
+     first boot writes the DAC EEPROM once.
+  2. Dots and lines run as before; drop size and position unchanged at low
+     speed, more regular at high speed.  `status` `max_event_late_pulses`
+     should stay ~0-1.
+  3. No `pick_timeout` / `close_late` / `decay_timeout` during normal runs.
+     A `pick_timeout` on lines means the coil needs more than 3 ms to reach
+     pick (raise `PICK_LIMIT_US`) or the sense path is wrong.
+  4. Edit a line's pattern while it runs: that gun stops for the current
+     sheet and continues from the next one; no gun stays open.
+  5. Stop the conveyor mid-line with min speed 0: the line closes after
+     ~200 ms and re-opens when the conveyor moves.
+  6. Test buttons still work; `peak` debug events show time-to-peak.
+  7. Settings: pick above 1.5 A is refused.
 - **TO CHECK — lines min-speed pause/resume (added 2026-10-06, flashed but
   NOT yet tested on the conveyor).**  See §4 speed-safety and
   `speedGate()` in `rt/PatternScheduler.cpp`.  Test in Lines mode:
@@ -289,9 +366,11 @@ src/                           (ESP32-S3 firmware)
   main.cpp
   config/Config.{h,cpp}
   comms/Events.{h,cpp}    UartJson.{h,cpp}   CommandDispatcher.{h,cpp}   LiveSync.{h,cpp}
-  hw/Pins.h               Driver.{h,cpp}   Dac.{h,cpp}   Encoder.{h,cpp}
+  hw/Pins.h               Driver.{h,cpp}   Dac.{h,cpp}   Encoder.{h,cpp}   RtTimers.{h,cpp}
   rt/Control.{h,cpp}      GunSequencer.{h,cpp}   PatternScheduler.{h,cpp}   TestRunner.{h,cpp}
   sys/Fault.{h,cpp}       Watchdog.{h,cpp}       Status.{h,cpp}
+tools/
+  check_isr_iram.py            Interrupt flash-safety check on the built ELF
 gui/                           (PySide6 operator UI)
   run.py                       Launcher (`--mock` for offline dev)
   requirements.txt

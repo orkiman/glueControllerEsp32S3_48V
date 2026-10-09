@@ -26,9 +26,12 @@
 //   status    prio 2    5 Hz status events
 //
 // Core 1 (Real-Time Hardware):
-//   pattern   prio 7    Encoder poll + fire pattern events
+//   pattern   prio 7    Fire pattern events (woken at the due encoder pulse)
 //   dac       prio 6    MCP4728 I2C writer
 //   <ISRs>    IRAM      Peak (per gun) + photocell + nFAULT + PCNT overflow
+//                       + close alarm + 50 us safety supervisor (hw timers)
+//
+// Core 0 also runs rt_check (esp_timer, 1 ms): last-resort drop close.
 // =============================================================================
 
 void setup() {
