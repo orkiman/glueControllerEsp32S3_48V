@@ -29,7 +29,10 @@ static constexpr int64_t  DECAY_STUCK_US       = 2000;   // near-zero on the DAC
 static constexpr int64_t  DECAY_MAX_US         = 5000;   // near-zero never confirmed: let the coil coast
 static constexpr uint8_t  DECAY_LOW_TICKS      = 2;      // comparator low this many ticks in a row
 static constexpr uint32_t CHECKER_PERIOD_US    = 1000;
-static constexpr uint8_t  TICK_STALL_CHECKS    = 3;
+// Supervisor tick counted as stalled after this long without a tick.  Real
+// time, not a number of checker runs: esp_timer runs late periodic callbacks
+// back to back (e.g. after Wi-Fi init or a flash write), microseconds apart.
+static constexpr int64_t  TICK_STALL_US        = 3000;
 // A trip streak ends with a good drop (hold confirmed) or after this long
 // without a trip, so isolated trips far apart never add up to a stop.
 static constexpr int64_t  STREAK_RESET_US      = 60'000'000;
@@ -69,8 +72,8 @@ static volatile bool      s_diag       = false;
 static volatile bool      s_rtOk       = false;   // hardware timers running
 static TickHook           s_tickHook   = nullptr;
 static volatile uint32_t  s_tickCount  = 0;
-static uint32_t           s_ticksSeen  = 0;       // Core 0 checker only
-static uint8_t            s_tickStalls = 0;       // Core 0 checker only
+static uint32_t           s_ticksSeen   = 0;      // Core 0 checker only
+static int64_t            s_ticksSeenUs = 0;      // when s_tickCount last moved
 static esp_timer_handle_t s_checker    = nullptr;
 
 static volatile uint32_t   s_tripCount      = 0;
@@ -376,10 +379,10 @@ static void checkerCb(void*) {
     // The supervisor tick must keep counting; restart it if it stopped.
     uint32_t ticks = s_tickCount;
     if (ticks != s_ticksSeen) {
-        s_ticksSeen  = ticks;
-        s_tickStalls = 0;
-    } else if (++s_tickStalls >= TICK_STALL_CHECKS) {
-        s_tickStalls = 0;
+        s_ticksSeen   = ticks;
+        s_ticksSeenUs = now;
+    } else if (now - s_ticksSeenUs >= TICK_STALL_US) {
+        s_ticksSeenUs = now;
         rttimer::supervisorRestart();
         noteLocked(notes, 0, TripReason::TickStalled);
     }
@@ -412,6 +415,7 @@ void init() {
     if (!s_rtOk)               evt::postError("rt", "timer_init_failed");
     if (xPortGetCoreID() != 1) evt::postError("rt", "rt_not_on_core1");
 
+    s_ticksSeenUs = esp_timer_get_time();
     esp_timer_create_args_t a = {};
     a.callback        = &checkerCb;
     a.dispatch_method = ESP_TIMER_TASK;
@@ -419,6 +423,8 @@ void init() {
     esp_timer_create(&a, &s_checker);
     esp_timer_start_periodic(s_checker, CHECKER_PERIOD_US);
 }
+
+uint32_t supervisorTicks() { return s_tickCount; }
 
 void onConfigApplied() {
     const cfg::RuntimeConfig* c = cfg::Config::active();

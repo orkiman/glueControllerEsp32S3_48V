@@ -99,6 +99,9 @@ struct TripInfo {
 TripInfo tripInfo();
 const char* tripReasonName(TripReason r);
 
+// Supervisor tick count since boot (~20000 per second while it runs).
+uint32_t supervisorTicks();
+
 // Peak-detection diagnostics for manual tests: each drop reports a `debug`
 // event "peak" (us from open to the LM339 trip) or "nopeak".
 void setDiag(bool on);

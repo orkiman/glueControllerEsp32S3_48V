@@ -75,6 +75,7 @@ static void emitterTask(void*) {
                 doc["pattern_events"]        = e.u3;
                 doc["sheet_queue_overflows"] = e.u4;
                 doc["sheet_count"]           = e.u5;
+                doc["rt_ticks"]              = e.u6;
                 break;
             case Kind::WatchdogTimeout:
                 doc["event"] = "watchdog_timeout";
@@ -228,7 +229,7 @@ void postWatchdogTimeout() {
 void postStatus(float pos_mm, float speed_mm_s, bool active,
                 uint32_t maxLoopGapUs, uint32_t maxEventLatePulses,
                 uint32_t patternEvents, uint32_t sheetQueueOverflows,
-                uint32_t sheetCount) {
+                uint32_t sheetCount, uint32_t rtTicks) {
     Event e{}; e.kind = Kind::Status;
     e.f1 = pos_mm; e.f2 = speed_mm_s; e.b1 = active ? 1 : 0;
     e.u1 = maxLoopGapUs;
@@ -236,6 +237,7 @@ void postStatus(float pos_mm, float speed_mm_s, bool active,
     e.u3 = patternEvents;
     e.u4 = sheetQueueOverflows;
     e.u5 = sheetCount;
+    e.u6 = rtTicks;
     post(e);
 }
 

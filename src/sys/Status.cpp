@@ -1,4 +1,5 @@
 #include "Status.h"
+#include "rt/GunSequencer.h"
 #include "rt/PatternScheduler.h"
 #include "config/Config.h"
 #include "comms/Events.h"
@@ -19,7 +20,8 @@ static void statusTask(void*) {
                         metrics.max_event_late_pulses,
                         metrics.pattern_events,
                         metrics.sheet_queue_overflows,
-                        pattern::sheetCount());
+                        pattern::sheetCount(),
+                        seq::supervisorTicks());
         vTaskDelay(pdMS_TO_TICKS(200));   // 5 Hz
     }
 }
