@@ -341,16 +341,6 @@ cd gui
      ~200 ms and re-opens when the conveyor moves.
   6. Test buttons still work; `peak` debug events show time-to-peak.
   7. Settings: pick above 1.5 A is refused.
-- **TO CHECK — lines min-speed pause/resume (added 2026-10-06, flashed but
-  NOT yet tested on the conveyor).**  See §4 speed-safety and
-  `speedGate()` in `rt/PatternScheduler.cpp`.  Test in Lines mode:
-  1. Slow below `min_speed_mm_s` mid-line -> gun must close immediately.
-  2. Full stop mid-line -> gun closes within ~one pulse period (no blob).
-  3. Speed back up while still inside the line -> gun re-opens and the line
-     finishes at `end_mm`.
-  4. Speed hovering at the limit -> no rapid on/off chatter.
-  5. Dots unaffected by min speed; GUI/web speed reading smooth (300 ms).
-  Note: `pulses_per_mm` was still 1 at the time -- calibrate first.
 
 ---
 
