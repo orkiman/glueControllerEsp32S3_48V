@@ -112,7 +112,12 @@ Each trip is `{"event":"error","cmd":"gunN","reason":...}`.  Three trips in
 a row on one gun (no good drop in between, < 60 s apart) stop the machine
 like a stop command: `{"event":"error","cmd":"gunN","reason":"safety_stop"}`.
 `set_active:true` clears the streaks.  `/api/status` reports `trips`,
-`last_trip_gun`, `last_trip`; the GUI status bar and the web page show them.
+`last_trip_gun`, `last_trip` and `stop_cause` (the trip that caused the last
+`safety_stop`).  The GUI and the web page show an operator alert under the
+header: a single trip is an amber warning (15 s) that says what happened and
+what to check; a safety stop is a red alert naming the gun and the cause
+(e.g. gun not connected -> "check the gun is connected, or set it to None")
+that stays until the operator closes it or starts the machine again.
 
 Remaining limit: with dots, a dead current sense cannot be detected ("no
 peak" is normal for short dots), so each dot runs up to its on-time

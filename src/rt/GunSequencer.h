@@ -95,6 +95,7 @@ struct TripInfo {
     uint32_t   count;      // trips since boot
     uint8_t    gun;        // 1-based gun of the last trip (0 = none)
     TripReason reason;
+    TripReason stopCause;  // trip that caused the last SafetyStop (operator message)
 };
 TripInfo tripInfo();
 const char* tripReasonName(TripReason r);

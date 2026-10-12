@@ -79,6 +79,7 @@ static esp_timer_handle_t s_checker    = nullptr;
 static volatile uint32_t   s_tripCount      = 0;
 static volatile uint8_t    s_lastTripGun    = 0;
 static volatile TripReason s_lastTripReason = TripReason::None;
+static volatile TripReason s_stopCause      = TripReason::None;
 
 // Event text in DRAM: interrupts read it while the flash cache may be off.
 static_assert(pins::NUM_GUNS == 4, "kGunName lists four guns");
@@ -201,6 +202,7 @@ static void IRAM_ATTR tripLocked(uint8_t g, TripReason r, int64_t nowUs, Notes& 
     if (s.tripStreak < 255) s.tripStreak = s.tripStreak + 1;
     if (s.tripStreak >= TRIP_STREAK_STOP && cfg::g_sys.active.load(std::memory_order_acquire)) {
         stopAllLocked(nowUs, notes);
+        s_stopCause = r;
         noteLocked(notes, g + 1, TripReason::SafetyStop);
     }
 }
@@ -554,6 +556,7 @@ TripInfo tripInfo() {
     t.count  = s_tripCount;
     t.gun    = s_lastTripGun;
     t.reason = s_lastTripReason;
+    t.stopCause = s_stopCause;
     portEXIT_CRITICAL(&s_mux);
     return t;
 }

@@ -11,19 +11,24 @@ from app import protocol as proto
 from app.state import AppState
 from ui.screens.configure import ConfigureScreen
 from ui.screens.patterns import PatternsScreen
+from ui.widgets.alert_banner import AlertBanner
 from ui.widgets.connection_bar import ConnectionBar
 from ui.widgets.program_bar import ProgramBar
 from ui.widgets.run_panel import RunPanel
 
 # Firmware safety trips: {"event":"error","cmd":"gunN"|"rt","reason":...}.
+# Operator wording: what happened, then what to do.  Keep in sync with the
+# tripReasons table in src/net/WebPage.h.
 _TRIP_TEXT = {
-    "pick_timeout":  "לא הגיע לזרם החזקה תוך 3ms — האקדח נסגר",
-    "decay_timeout": "הזרם לא ירד אחרי סגירה — האקדח נותק",
-    "close_late":    "טיפה נסגרה באיחור — נסגרה בכוח",
-    "in1_stray":     "יציאה נמצאה פתוחה בלי טיפה — נסגרה",
-    "tick_stalled":  "בקר הבטיחות נעצר והופעל מחדש",
-    "safety_stop":   "עצירת בטיחות — המכונה נעצרה אחרי תקלות חוזרות",
+    "pick_timeout":  "האקדח לא נפתח — הזרם בסליל לא עלה. "
+                     "בדוק שהאקדח מחובר ושהכבל תקין. "
+                     "אם האקדח לא בשימוש, הגדר את הסוג שלו ל'ללא'.",
+    "decay_timeout": "הזרם בסליל לא ירד אחרי סגירה. בדוק את האקדח והכבל.",
+    "close_late":    "טיפה נסגרה באיחור ונסגרה בכוח. אם זה חוזר — פנה לטכנאי.",
+    "in1_stray":     "יציאת האקדח נמצאה פתוחה בלי סיבה ונסגרה. אם זה חוזר — פנה לטכנאי.",
+    "tick_stalled":  "מערכת הבטיחות של הבקר נעצרה והופעלה מחדש. אם זה חוזר — פנה לטכנאי.",
 }
+_WARN_MS = 15000
 
 
 class MainWindow(QMainWindow):
@@ -56,25 +61,38 @@ class MainWindow(QMainWindow):
         v = QVBoxLayout(root)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
+        self.alert = AlertBanner()
+        self._last_trip: dict[str, str] = {}   # "gunN" -> last trip reason
+
         v.addWidget(ConnectionBar(state, RunPanel(state)))
         v.addWidget(self.program_bar)
+        v.addWidget(self.alert)
         v.addWidget(body, 1)
         self.setCentralWidget(root)
 
         # status bar shows ping/connection text
         state.connection_changed.connect(self._on_conn)
         state.error_received.connect(self._on_error)
+        # The stop message stays until the operator starts the machine again.
+        state.status_changed.connect(
+            lambda s: self.alert.clear("stop") if s.active else None)
 
     def _on_conn(self, ok: bool, reason: str) -> None:
         self.statusBar().showMessage("מחובר" if ok else f"מנותק — {reason}")
 
     def _on_error(self, cmd: str, reason: str) -> None:
+        where = f"אקדח {cmd[3:]}" if cmd.startswith("gun") else "בקר"
+        if reason == "safety_stop":
+            # The firmware sends the trip that caused the stop just before it.
+            cause = _TRIP_TEXT.get(self._last_trip.get(cmd, ""), "")
+            self.alert.show_alert(
+                f"המכונה נעצרה — {where}: תקלות בטיחות חוזרות.\n"
+                f"{cause}\nאחרי התיקון לחץ 'הפעל'.", "stop")
+            return
         trip = _TRIP_TEXT.get(reason)
         if trip:
-            where = f"אקדח {cmd[3:]}" if cmd.startswith("gun") else "בקר"
-            # A safety stop stays on screen until the next message.
-            self.statusBar().showMessage(f"{where}: {trip}",
-                                         0 if reason == "safety_stop" else 10000)
+            self._last_trip[cmd] = reason
+            self.alert.show_alert(f"{where}: {trip}", "warn", _WARN_MS)
             return
         if reason == "pick_too_high":
             self.statusBar().showMessage(

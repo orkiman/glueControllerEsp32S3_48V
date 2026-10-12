@@ -95,6 +95,7 @@ static void sendStatus() {
     doc["trips"] = trip.count;
     doc["last_trip_gun"] = trip.gun;
     doc["last_trip"] = seq::tripReasonName(trip.reason);
+    doc["stop_cause"] = seq::tripReasonName(trip.stopCause);
     doc["rt_ticks"] = seq::supervisorTicks();
     String body;
     serializeJson(doc, body);
