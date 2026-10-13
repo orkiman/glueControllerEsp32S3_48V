@@ -68,8 +68,10 @@ void init();                                  // peak ISRs, hardware timers, che
 // onMs == 0 => the gun's pattern.on_timeout_ms; otherwise the caller's total
 // on-time in ms (lines: long ceiling, closed by position).  Returns false if
 // the gun is still open (the new drop is ignored), the DAC write failed or
-// the system is inactive / faulted.  On success *outDrop receives the drop id.
-bool fire(uint8_t gunIdx, uint32_t onMs = 0, uint32_t* outDrop = nullptr);
+// firing is not allowed: production drops (test=false) need the machine
+// active; test drops (test=true) need it stopped, not calibrating, and test
+// mode on.  Never while faulted.  On success *outDrop receives the drop id.
+bool fire(uint8_t gunIdx, uint32_t onMs = 0, uint32_t* outDrop = nullptr, bool test = false);
 
 // Close the gun now.  Any context, IRAM-safe.
 void abort(uint8_t gunIdx) IRAM_ATTR;
@@ -106,5 +108,9 @@ uint32_t supervisorTicks();
 // Peak-detection diagnostics for manual tests: each drop reports a `debug`
 // event "peak" (us from open to the LM339 trip) or "nopeak".
 void setDiag(bool on);
+
+// Test mode (set by the test runner): allows test drops while the machine is
+// stopped.  A safety stop turns it off.
+void setTestMode(bool on);
 
 } // namespace seq

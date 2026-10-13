@@ -99,9 +99,24 @@ struct Notes {
 };
 
 // ---------- helpers ----------
+// Gun tests run only while the machine is stopped (s_testMode set by the
+// test runner); production firing only while it is active.
+static volatile bool s_testMode = false;
+
 static inline bool IRAM_ATTR systemArmed() {
     return cfg::g_sys.active.load(std::memory_order_acquire) &&
           !cfg::g_sys.fault .load(std::memory_order_acquire);
+}
+
+static inline bool IRAM_ATTR testArmed() {
+    return s_testMode &&
+          !cfg::g_sys.active     .load(std::memory_order_acquire) &&
+          !cfg::g_sys.calibrating.load(std::memory_order_acquire) &&
+          !cfg::g_sys.fault      .load(std::memory_order_acquire);
+}
+
+static inline bool IRAM_ATTR mayFire(bool test) {
+    return test ? testArmed() : systemArmed();
 }
 
 static inline void IRAM_ATTR copyStr(char* dst, size_t cap, const char* src) {
@@ -190,6 +205,7 @@ static void IRAM_ATTR noteLocked(Notes& notes, uint8_t gun1, TripReason r) {
 // Machine stop after repeated trips: same end state as a stop command.
 static void IRAM_ATTR stopAllLocked(int64_t nowUs, Notes& notes) {
     cfg::g_sys.active.store(false, std::memory_order_release);
+    s_testMode = false;                      // running tests stop firing too
     for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) notes.kickDac |= closeLocked(g, nowUs);
     drv::killAll();                          // IN1, IN2, MUX_SELECT low: coast
     for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) s_g[g].decaying = false;
@@ -202,7 +218,8 @@ static void IRAM_ATTR tripLocked(uint8_t g, TripReason r, int64_t nowUs, Notes& 
     if (nowUs - s.lastTripUs > STREAK_RESET_US) s.tripStreak = 0;
     s.lastTripUs = nowUs;
     if (s.tripStreak < 255) s.tripStreak = s.tripStreak + 1;
-    if (s.tripStreak >= TRIP_STREAK_STOP && cfg::g_sys.active.load(std::memory_order_acquire)) {
+    if (s.tripStreak >= TRIP_STREAK_STOP &&
+        (cfg::g_sys.active.load(std::memory_order_acquire) || s_testMode)) {
         stopAllLocked(nowUs, notes);
         s_stopCause = r;
         noteLocked(notes, g + 1, TripReason::SafetyStop);
@@ -458,11 +475,12 @@ void onActivate() {
 
 void setTickHook(TickHook hook) { s_tickHook = hook; }
 void setDiag(bool on)           { s_diag = on; }
+void setTestMode(bool on)       { s_testMode = on; }
 
 // ---------- public API ----------
-bool fire(uint8_t g, uint32_t onMs, uint32_t* outDrop) {
+bool fire(uint8_t g, uint32_t onMs, uint32_t* outDrop, bool test) {
     if (g >= pins::NUM_GUNS || xPortInIsrContext()) return false;
-    if (!s_rtOk || !systemArmed()) return false;
+    if (!s_rtOk || !mayFire(test)) return false;
 
     int64_t onUs = (onMs == 0)
         ? (int64_t)(cfg::Config::active()->pattern[g].on_timeout_ms * 1000.0f)
@@ -487,7 +505,7 @@ bool fire(uint8_t g, uint32_t onMs, uint32_t* outDrop) {
     bool     opened = false;
     uint32_t drop   = 0;
     portENTER_CRITICAL(&s_mux);
-    if (s.arming && dacOk && systemArmed()) {
+    if (s.arming && dacOk && mayFire(test)) {
         int64_t now = esp_timer_get_time();
         s.arming    = false;
         s.drop      = (s.drop + 1 == 0) ? 1 : s.drop + 1;

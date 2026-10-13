@@ -2,6 +2,7 @@
 #include "hw/Driver.h"
 #include "rt/GunSequencer.h"
 #include "rt/PatternScheduler.h"
+#include "rt/TestRunner.h"
 #include "config/Config.h"
 #include "comms/Events.h"
 
@@ -18,10 +19,13 @@ static void wdTask(void*) {
     for (;;) {
         uint32_t now = millis();
         uint32_t last = cfg::g_sys.lastCmdMs.load(std::memory_order_acquire);
-        bool armed = cfg::g_sys.active.load(std::memory_order_acquire);
+        // Armed while running and while a gun test runs (tests run stopped).
+        bool armed = cfg::g_sys.active.load(std::memory_order_acquire) ||
+                     testrun::anyRunning();
 
         if (armed && (now - last) > TIMEOUT_MS && !s_tripped) {
             s_tripped = true;
+            testrun::stopAll();
             drv::killAll();
             seq::abortAll();
             pattern::abortAll();

@@ -102,10 +102,15 @@ class GunToolbar(QGroupBox):
         self._update_test_enabled()
 
     def _update_test_enabled(self, _ok: bool = False, _reason: str = "") -> None:
+        # Gun tests run only while the machine is stopped (firmware rule).
+        status = self.state.status
         enabled = (self.state.link.connected and
-                   self.state.status.active and
+                   not status.active and not status.calibrating and
                    self.state.patterns[self.gun_idx].type != proto.PatternType.NONE)
         self.btn_test.setEnabled(enabled)
+        if not enabled:
+            # Starting the machine (or calibration) ends a running test.
+            self._release_test_button()
 
     def set_droplet_from_state(self, on_timeout_ms: float) -> None:
         self.f_droplet.setValue(on_timeout_ms)

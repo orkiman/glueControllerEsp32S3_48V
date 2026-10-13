@@ -16,6 +16,8 @@
 //   None  : error (no pattern configured for this gun).
 //
 // For test_open with gun==0 the same logic is broadcast to all 4 guns.
+// Tests run only while the machine is stopped (not active, not calibrating);
+// starting the machine or calibration stops them.
 // =============================================================================
 
 namespace testrun {
@@ -29,5 +31,8 @@ bool start(uint8_t gunOneBased, uint32_t timeout_ms);
 // Stop a running test (and abort any in-flight gun sequence).
 void stop(uint8_t gunOneBased);
 void stopAll();
+
+// True while a test is running on any gun.
+bool anyRunning();
 
 } // namespace testrun

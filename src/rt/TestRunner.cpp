@@ -31,7 +31,7 @@ static void doStop(uint8_t g);
 static void dotTickCb(void* user) {
     uint8_t g = (uint8_t)(uintptr_t)user;
     if (s_t[g].mode.load(std::memory_order_acquire) != Mode::Dots) return;
-    seq::fire(g, 0);   // on-time = pattern[g].on_timeout_ms
+    seq::fire(g, 0, nullptr, true);   // on-time = pattern[g].on_timeout_ms
 }
 
 static void deadlineCb(void* user) {
@@ -85,7 +85,7 @@ static bool startOne(uint8_t g, uint32_t timeout_ms) {
     if (pt == cfg::PatternType::Lines) {
         // Single open-for-timeout line.  seq::fire's hold cap is enforced
         // inside the sequencer (30 s); command validation enforces timeout<=30000.
-        if (!seq::fire(g, timeout_ms)) return false;
+        if (!seq::fire(g, timeout_ms, nullptr, true)) return false;
         s_t[g].mode.store(Mode::Line, std::memory_order_release);
         // Deadline timer not strictly needed (hold timer already drives Phase 3
         // at timeout), but we use it to clear our `mode` state for stop()/diag.
@@ -95,7 +95,7 @@ static bool startOne(uint8_t g, uint32_t timeout_ms) {
 
     // Dots: periodic 20 Hz tick + one-shot deadline.
     s_t[g].mode.store(Mode::Dots, std::memory_order_release);
-    seq::fire(g, 0);                                              // first dot now
+    seq::fire(g, 0, nullptr, true);                               // first dot now
     esp_timer_start_periodic(s_t[g].tickTimer, DOT_PERIOD_US);
     esp_timer_start_once    (s_t[g].deadlineTimer, (uint64_t)timeout_ms * 1000ull);
     return true;
@@ -110,6 +110,7 @@ bool start(uint8_t gunOneBased, uint32_t timeout_ms) {
     // Peak diagnostics are only interesting during a manual test; leave them
     // off during production pattern firing to keep the event stream quiet.
     seq::setDiag(true);
+    seq::setTestMode(true);              // tests fire only while the machine is stopped
     if (gunOneBased == 0) {
         bool any = false;
         for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
@@ -131,7 +132,15 @@ void stop(uint8_t gunOneBased) {
 
 void stopAll() {
     for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) doStop(g);
+    seq::setTestMode(false);
     seq::setDiag(false);
+}
+
+bool anyRunning() {
+    for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
+        if (s_t[g].mode.load(std::memory_order_acquire) != Mode::None) return true;
+    }
+    return false;
 }
 
 } // namespace testrun

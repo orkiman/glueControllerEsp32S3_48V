@@ -13,6 +13,8 @@ namespace rt {
 
 void onSetActive(bool active) {
     if (active) {
+        // Gun tests run only while stopped: starting the machine ends them.
+        testrun::stopAll();
         // Re-arm from a possibly inactive / faulted state.  Operator clears
         // the fault latch by issuing set_active:true (see UartJson).
         pattern::onConfigApplied();
@@ -44,6 +46,7 @@ static void leaveCalibration(bool resume) {
 }
 
 void onCalibArm(float paperLengthMm) {
+    testrun::stopAll();                     // no gun tests while measuring
     if (!cfg::g_sys.calibrating.load(std::memory_order_acquire)) {
         // Same stop as set_active:false -- nothing fires while measuring.
         s_calibResume = cfg::g_sys.active.load(std::memory_order_acquire);
@@ -76,8 +79,13 @@ void onTestOpen(uint8_t gun, uint32_t timeout_ms) {
         evt::postError("test_open", "hardware_fault");
         return;
     }
-    if (!cfg::g_sys.active.load(std::memory_order_acquire)) {
-        evt::postError("test_open", "not_active");
+    // Gun tests run only while the machine is stopped.
+    if (cfg::g_sys.active.load(std::memory_order_acquire)) {
+        evt::postError("test_open", "machine_active");
+        return;
+    }
+    if (cfg::g_sys.calibrating.load(std::memory_order_acquire)) {
+        evt::postError("test_open", "calibrating");
         return;
     }
     // Behaviour follows the gun's configured pattern type:

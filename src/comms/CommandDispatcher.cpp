@@ -233,6 +233,9 @@ static Result handleTestOpen(JsonDocument& doc) {
         return makeResult(false, "test_open","bad_timeout");
     }
     if (cfg::g_sys.fault.load())     { return makeResult(false, "test_open","hardware_fault"); }
+    // Gun tests run only while the machine is stopped.
+    if (cfg::g_sys.active.load())      { return makeResult(false, "test_open","machine_active"); }
+    if (cfg::g_sys.calibrating.load()) { return makeResult(false, "test_open","calibrating"); }
     rt::onTestOpen(gun, timeout);
     return makeResult(true, "test_open");
 }

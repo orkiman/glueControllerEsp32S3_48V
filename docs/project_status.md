@@ -185,7 +185,15 @@ currently configured pattern type (see `rt/TestRunner.cpp`):
 | `none`       | `{"event":"error","cmd":"test_open","reason":"no_pattern_or_busy"}`  |
 
 `gun:0` broadcasts the test to every gun with a configured pattern.
-`timeout_ms` is capped at 5000 in `UartJson::handleTestOpen`.
+`timeout_ms` is operator-set, max 30000 (`CommandDispatcher::handleTestOpen`).
+
+**Tests run only while the machine is stopped** (not active, not
+calibrating); otherwise `test_open` fails with `machine_active` /
+`calibrating`.  Test drops use `seq::fire(..., test=true)`, allowed only in
+test mode (set by the test runner) with the machine stopped.  Starting the
+machine or calibration stops running tests.  The link watchdog also covers a
+running test (2 s without PC / web contact stops it), and the safety
+supervisor applies as in production (a safety stop ends test mode).
 
 ---
 
@@ -344,8 +352,8 @@ Example payload:
 | Live sync with web UI | Web-side edits arrive as `config` / `pattern` / `programs_list` events and update the GUI immediately |
 | ISR-safe abort (firmware) | `seq::abort` no longer calls `esp_timer_stop` from `faultIsr` (ISR context) — this was panicking/rebooting the ESP32 on every `test_open` when nFAULT asserted (e.g. DRV8262 with no 48 V) |
 | Clean shutdown | `MainWindow.closeEvent` closes the serial thread before exit to avoid QThread warnings |
-| Test button safety | Test button disabled when disconnected or system inactive; shows "עצור בדיקה" while running; auto-releases on timeout/error |
-| `test_open` errors | `not_active` / `no_pattern` / `busy` / `hardware_fault` (previously all collapsed into `no_pattern_or_busy`) |
+| Test button safety | Test button enabled only when connected and the machine is stopped (not active, not calibrating); released when the machine starts, on timeout or error |
+| `test_open` errors | `machine_active` / `calibrating` / `no_pattern` / `busy` / `hardware_fault` |
 
 To run:
 ```powershell
