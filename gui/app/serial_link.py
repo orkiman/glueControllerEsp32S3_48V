@@ -40,7 +40,14 @@ class _RxTxThread(QThread):
 
     def run(self) -> None:  # noqa: D401
         try:
-            ser = serial.Serial(self._port, self._baud, timeout=0.05)
+            # DTR/RTS drive the ESP32 auto-reset (EN / IO0) on the CP2102.
+            # Opening with them asserted restarted the controller on every
+            # connect -- mid-run that stops the machine.  Keep both released.
+            ser = serial.Serial()
+            ser.port, ser.baudrate, ser.timeout = self._port, self._baud, 0.05
+            ser.dtr = False
+            ser.rts = False
+            ser.open()
         except Exception as exc:  # noqa: BLE001
             self.failed.emit(str(exc))
             return

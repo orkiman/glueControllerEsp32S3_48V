@@ -337,6 +337,7 @@ Example payload:
 | Dark RTL theme | `styles.qss` + `Qt.RightToLeft` layout direction |
 | Live pattern type push | Toolbar combo changes push `set_pattern` immediately to the firmware |
 | `set_pattern type:none` | Firmware now accepts `none` to clear/disable a gun |
+| No reset on connect | Port opened with DTR/RTS released, so connecting / reconnecting does not restart the controller via the CP2102 auto-reset (it did until 2026-10-13) |
 | COM port persistence | Dropdown auto-selects the last port, switches ports when changed, and saves the last connected port |
 | Sync on connect | GUI pulls the controller state with `get_state` when the link opens; the controller is the source of truth |
 | Resync on firmware reboot | GUI pulls the state again whenever a `ready` event arrives (the controller restores its active program from flash at boot) |
