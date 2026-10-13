@@ -342,11 +342,11 @@ Example payload:
 
 | Feature | Notes |
 | ------- | ----- |
-| Multi-program management | `ui/widgets/program_bar.py` — the program store lives on the controller (SPIFFS) and is shared with the web UI; dropdown, save, save-as, new, delete; edits autosave 2 s after the last change, also while running |
+| Multi-program management | `ui/widgets/program_bar.py` — the program store lives on the controller (SPIFFS) and is shared with the web UI; dropdown, save-as, new, delete; edits autosave 2 s after the last change, also while running (no plain save button) |
 | Event log filtering | Routine `status` and `ping_ack` events never shown in the panel (full stream: debug mode → `debug.log`); live values are in the header |
 | Outbound command log | All `_send()` calls (except ping) appear in the event log |
 | Dynamic canvas | Canvas grows automatically when a segment is dragged or added outside current bounds; minimum 100 mm (was 400), margin 20 % of the pattern (10..100 mm); fills the view width (zoomed in for short patterns), long patterns keep 1.6 px/mm and scroll; ruler step adapts.  Web previews use the same minimum |
-| Admin mode | Without admin only these are open: choosing a program, start/stop, sheet-counter reset, the event log (and cancelling a running calibration / stopping a running test).  Everything else needs admin: Settings tab, program save / save-as / new / delete, pattern editing (type, segments, drop size — editor becomes view-only), gun tests and the test duration.  Password 1234 (shown in the prompt — only against accidental changes), 10 min with countdown, exit button in the header, Settings and Program tabs.  Web: same, admin button at the top of every screen (per browser tab) |
+| Admin mode | Without admin only these are open: choosing a program, start/stop, sheet-counter reset, the event log (and cancelling a running calibration / stopping a running test).  Everything else needs admin: Settings tab, program save-as / new / delete, pattern editing (type, segments, drop size — editor becomes view-only), gun tests and the test duration.  Password 1234 (shown in the prompt — only against accidental changes), 10 min with countdown, exit button in the header, Settings and Program tabs.  Web: same, admin button at the top of every screen (per browser tab) |
 | Overlap prevention | Drag, handle resize, and double-click add all prevent segment overlap |
 | Hebrew RTL fixes | Group-box title padding widened; lane labels use document margin |
 | Encoder calibration | Calibration mode (see §7.1c): arm / cancel button, blue banner + "קליברציה" state in the header, result / failure banner |

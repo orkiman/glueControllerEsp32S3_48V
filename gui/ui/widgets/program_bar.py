@@ -32,11 +32,9 @@ class ProgramBar(QWidget):
         self.combo.setMinimumWidth(220)
         self.combo.currentIndexChanged.connect(self._on_combo_changed)
 
-        btn_save    = QPushButton("שמור")
         btn_save_as = QPushButton("שמירה בשם…")
         btn_new     = QPushButton("חדשה")
         btn_del     = QPushButton("מחק")
-        btn_save.clicked.connect(self._on_save)
         btn_save_as.clicked.connect(self._on_save_as)
         btn_new.clicked.connect(self._on_new)
         btn_del.clicked.connect(self._on_delete)
@@ -45,15 +43,15 @@ class ProgramBar(QWidget):
         lay.setContentsMargins(10, 6, 10, 6)
         lay.addWidget(QLabel("תוכנית:"))
         lay.addWidget(self.combo)
-        lay.addWidget(btn_save)
         lay.addWidget(btn_save_as)
         lay.addWidget(btn_new)
         lay.addStretch(1)
         lay.addWidget(btn_del)
 
-        # Choosing a program is always allowed; save / new / delete need
-        # admin mode.
-        self._edit_buttons = (btn_save, btn_save_as, btn_new, btn_del)
+        # Choosing a program is always allowed; save as / new / delete need
+        # admin mode.  Edits autosave on the controller (2 s after the last
+        # change), so there is no plain "save".
+        self._edit_buttons = (btn_save_as, btn_new, btn_del)
         state.admin.changed.connect(self._apply_lock)
         self._apply_lock(state.admin.active)
 
@@ -100,13 +98,6 @@ class ProgramBar(QWidget):
         LOGGER.debug("combo changed -> load_program id=%s", pid)
         if pid:
             self.state.load_program(pid)
-
-    def _on_save(self) -> None:
-        pid = self._current_id()
-        name = self.combo.currentText()
-        if not pid or not name:
-            return
-        self.state.save_program(pid, name)
 
     def _on_save_as(self) -> None:
         name, ok = QInputDialog.getText(self, "שמירה בשם", "שם התוכנית:")

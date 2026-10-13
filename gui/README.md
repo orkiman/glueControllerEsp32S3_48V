@@ -71,7 +71,7 @@ gui/
     widgets/
       connection_bar.py        header row: run panel + status LED + COM picker
       run_panel.py             start/stop, state, speed, sheet count (header)
-      program_bar.py           program selector / save / delete
+      program_bar.py           program selector / save-as / new / delete
       numeric_field.py         labelled spinbox with units
       pattern_editor.py        QGraphicsView pattern canvas (TBD)
     screens/
