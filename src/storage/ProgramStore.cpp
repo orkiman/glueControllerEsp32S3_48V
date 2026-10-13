@@ -164,6 +164,7 @@ static bool writeProgramFile(uint8_t id, const cfg::RuntimeConfig* config, const
     cfgObj["pick_current_a"]      = config->pick_current_a;
     cfgObj["hold_current_a"]      = config->hold_current_a;
     cfgObj["encoder_source"]      = config->encoder_source;
+    cfgObj["photocell_invert"]    = config->photocell_invert;
 
     JsonArray patterns = doc["patterns"].to<JsonArray>();
     for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
@@ -234,6 +235,8 @@ static bool validateAndParse(JsonDocument& doc, cfg::RuntimeConfig& out, char* n
     out.pick_current_a       = pickA;
     out.hold_current_a       = holdA;
     out.encoder_source       = encSrc;
+    // Optional: programs saved before the setting existed use the default.
+    out.photocell_invert     = cfgObj["photocell_invert"] | false;
 
     JsonArrayConst patterns = doc["patterns"].as<JsonArrayConst>();
     if (patterns.isNull() || patterns.size() != pins::NUM_GUNS) return false;

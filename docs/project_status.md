@@ -250,6 +250,20 @@ connect and after `ready`, and never pushes its local defaults.
 The UART line limit and the web command body limit are 4096 bytes, so a full
 64-element pattern fits.
 
+### 7.1d Photocell (INPUT1) polarity and live state
+
+- Hardware: INPUT1 drives a TLP291 channel whose collector pulls GPIO1 down
+  (RN2 10k pull-up), so **24V on INPUT1 = GPIO1 LOW**.  Until 2026-10-13 the
+  firmware took GPIO1 rising (= 24V *removed*) as the sheet's leading edge,
+  i.e. inverted for a sensor that switches on at the sheet.
+- Now a sheet = 24V present by default; `photocell_invert` (config, saved
+  with the program, set_config / config event / `/api/config`) flips it for
+  a sensor that switches off at the sheet.  Programs saved earlier load with
+  the default.
+- `status` and `/api/status` report `eye` (sees a sheet, after the invert)
+  and `in1_24v` (electrical level).  GUI header shows "עין" (lit = sheet,
+  tooltip = 24V/0V); web operate screen shows the same.
+
 ### 7.1c Calibration mode
 
 - `{"cmd":"calib_arm","paper_length_mm":L}` enters calibration mode: the
@@ -314,7 +328,7 @@ Example payload:
 | Feature | Notes |
 | ------- | ----- |
 | Multi-program management | `ui/widgets/program_bar.py` — the program store lives on the controller (SPIFFS) and is shared with the web UI; dropdown, save, save-as, new, delete; edits autosave 2 s after the last change, also while running |
-| Event log filtering | Routine `status` and `ping_ack` events hidden by default; opt-in checkbox to show them |
+| Event log filtering | Routine `status` and `ping_ack` events never shown in the panel (full stream: debug mode → `debug.log`); live values are in the header |
 | Outbound command log | All `_send()` calls (except ping) appear in the event log |
 | Dynamic canvas | Canvas grows automatically when a segment is dragged or added outside current bounds |
 | Overlap prevention | Drag, handle resize, and double-click add all prevent segment overlap |
@@ -366,6 +380,10 @@ cd gui
      ~200 ms and re-opens when the conveyor moves.
   6. Test buttons still work; `peak` debug events show time-to-peak.
   7. Settings: pick above 1.5 A is refused.
+- **TO CHECK — photocell polarity (2026-10-13).**  Put a sheet in front of
+  the eye: header "עין" must light ("● דף").  If it lights without a sheet
+  and goes dark with one, tick "הפוך לוגיקת עין" in Settings.  Then check
+  that patterns start at the sheet's leading edge (+ offset).
 - **TO CHECK — calibration mode with a real sheet (2026-10-13).**  Verified
   on the controller without a sheet: arm from active stops gluing, cancel and
   set_active restore / override correctly.  Still to check on the machine:

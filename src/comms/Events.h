@@ -37,6 +37,8 @@ struct Event {
     float   f2;           // Status: speed_mm_s
     uint8_t b1;           // Status: active flag
     uint8_t b2;           // Status: calibrating flag
+    uint8_t b3;           // Status: eye sees a sheet (after photocell_invert)
+    uint8_t b4;           // Status: 24V present on INPUT1 (eye, electrical)
     uint32_t u1;
     uint32_t u2;
     uint32_t u3;
@@ -65,6 +67,7 @@ void postWatchdogTimeout();
 void postStatus(float pos_mm, float speed_mm_s, bool active,
                 uint32_t maxLoopGapUs, uint32_t maxEventLatePulses,
                 uint32_t patternEvents, uint32_t sheetQueueOverflows,
-                uint32_t sheetCount, uint32_t rtTicks, bool calibrating);
+                uint32_t sheetCount, uint32_t rtTicks, bool calibrating,
+                bool eyeSheet, bool eyeIn24v);
 
 } // namespace evt

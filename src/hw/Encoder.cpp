@@ -77,9 +77,20 @@ static void IRAM_ATTR photocellIsr(void* /*arg*/) {
     s_lastEdgeUs = now;
 
     uint32_t p     = pulseCount();
-    int      level = gpio_ll_get_level(&GPIO, (gpio_num_t)pins::PHOTOCELL);
-    if (level) pattern::onPhotocellEdge(p);
+    // TLP291 on INPUT1: 24V present pulls GPIO1 LOW.  "Sheet" = 24V present,
+    // or = 24V absent with photocell_invert (sensor that switches off).
+    bool in24v = gpio_ll_get_level(&GPIO, (gpio_num_t)pins::PHOTOCELL) == 0;
+    bool sheet = in24v != cfg::Config::active()->photocell_invert;
+    if (sheet) pattern::onPhotocellEdge(p);
     else       pattern::onPhotocellFallingEdge(p);
+}
+
+bool photocellInput24v() {
+    return gpio_ll_get_level(&GPIO, (gpio_num_t)pins::PHOTOCELL) == 0;
+}
+
+bool photocellSheet() {
+    return photocellInput24v() != cfg::Config::active()->photocell_invert;
 }
 
 static void initPcnt(pcnt_unit_t unit, int8_t gpioPin, uint8_t srcIdx) {

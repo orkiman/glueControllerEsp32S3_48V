@@ -3,6 +3,7 @@
 #include "rt/PatternScheduler.h"
 #include "config/Config.h"
 #include "comms/Events.h"
+#include "hw/Encoder.h"
 
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
@@ -22,7 +23,9 @@ static void statusTask(void*) {
                         metrics.sheet_queue_overflows,
                         pattern::sheetCount(),
                         seq::supervisorTicks(),
-                        cfg::g_sys.calibrating.load(std::memory_order_acquire));
+                        cfg::g_sys.calibrating.load(std::memory_order_acquire),
+                        encoder::photocellSheet(),
+                        encoder::photocellInput24v());
         vTaskDelay(pdMS_TO_TICKS(200));   // 5 Hz
     }
 }

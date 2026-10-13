@@ -26,4 +26,8 @@ uint32_t pulseCount() IRAM_ATTR;
 // Software-injected photocell edge (sw_trigger command).  Task context.
 void injectSwTrigger();
 
+// Photocell (INPUT1) right now, for status.  Task context.
+bool photocellInput24v();   // electrical: 24V present on INPUT1
+bool photocellSheet();      // logical: sees a sheet (after photocell_invert)
+
 } // namespace encoder

@@ -52,6 +52,8 @@ class RuntimeConfig:
     # (GPIO5). Both are always counted in hardware; this only selects which
     # one drives pattern position tracking.
     encoder_source: int        = 0
+    # Eye on INPUT1: False = a sheet is 24V present, True = a sheet is 0V.
+    photocell_invert: bool     = False
 
 
 @dataclass
@@ -59,6 +61,8 @@ class LiveStatus:
     active: bool      = False
     fault: bool       = False
     calibrating: bool = False     # calibration mode: gluing stopped
+    eye: bool         = False     # photocell sees a sheet (after invert)
+    in1_24v: bool     = False     # 24V present on INPUT1 (electrical)
     speed_mm_s: float = 0.0
     sheet_count: int  = 0
     queue_depth: int  = 0
@@ -191,6 +195,8 @@ class AppState(QObject):
             s.active      = bool(ev.get("active", s.active))
             s.fault       = bool(ev.get("fault", s.fault))
             s.calibrating = bool(ev.get("calibrating", False))
+            s.eye         = bool(ev.get("eye", False))
+            s.in1_24v     = bool(ev.get("in1_24v", False))
             s.speed_mm_s  = float(ev.get("speed_mm_s", s.speed_mm_s))
             s.sheet_count = int(ev.get("sheet_count", s.sheet_count))
             s.queue_depth = int(ev.get("queue_depth", s.queue_depth))
@@ -222,6 +228,7 @@ class AppState(QObject):
             self.config.pick_current_a      = float(ev["pick_current_a"])
             self.config.hold_current_a        = float(ev["hold_current_a"])
             self.config.encoder_source      = int(ev["encoder_source"])
+            self.config.photocell_invert    = bool(ev.get("photocell_invert", False))
             self.config_changed.emit(self.config)
         except (KeyError, ValueError, TypeError):
             pass

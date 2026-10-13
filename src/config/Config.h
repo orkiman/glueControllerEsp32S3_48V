@@ -62,6 +62,10 @@ struct RuntimeConfig {
     //   0 = primary: fast 5V encoder on GPIO40 (pins::ENCODER)
     //   1 = alternate: 24V opto encoder on GPIO5 (pins::ENCODER_ALT)
     uint8_t  encoder_source        = 0;
+    // Photocell on INPUT1 (GPIO1) via TLP291: 24V on the input pulls GPIO1
+    // LOW.  false: a sheet = 24V present (sensor switches on at the sheet).
+    // true: a sheet = no 24V (sensor switches off at the sheet).
+    bool     photocell_invert      = false;
 
     // ---- per-gun pattern (includes per-gun on_timeout_ms / droplet size) ----
     GunPattern pattern[pins::NUM_GUNS];

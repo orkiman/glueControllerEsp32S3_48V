@@ -57,6 +57,16 @@ class ConfigureScreen(QWidget):
         glob_form.addRow(self.f_offset)
         glob_form.addRow(self.f_min_spd)
         glob_form.addRow(self.f_debounce)
+        # INPUT1 via TLP291: 24V on the input = GPIO1 low.  Default: a sheet
+        # is 24V present; tick for a sensor that switches off at the sheet.
+        self.chk_eye_invert = QCheckBox("הפוך לוגיקת עין (דף = אין 24V)")
+        self.chk_eye_invert.setToolTip(
+            "כבוי: העין מזהה דף כשיש 24V בכניסה 1.\n"
+            "מסומן: העין מזהה דף כשאין 24V (חיישן שנכבה כשיש דף).\n"
+            "אפשר לבדוק בכותרת: 'עין' נדלק כשדף מול העין.")
+        self.chk_eye_invert.toggled.connect(
+            lambda on: state.push_config(photocell_invert=bool(on)))
+        glob_form.addRow(self.chk_eye_invert)
 
         # ---- Calibration ---------------------------------------------------
         self.f_ppm   = NumericField("Pulses / mm", "",
@@ -92,8 +102,6 @@ class ConfigureScreen(QWidget):
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(2000)
 
-        self.chk_verbose = QCheckBox("הצג סטטוס שוטף")
-        self.chk_verbose.setChecked(False)
         # Full traffic to debug.log.  Off at every start (see app/logs.py).
         self.chk_debug = QCheckBox("מצב דיבאג (לוג מלא לקובץ)")
         self.chk_debug.setChecked(logs.debug_enabled())
@@ -106,7 +114,6 @@ class ConfigureScreen(QWidget):
         btn_export = QPushButton("ייצוא CSV…")
         btn_export.clicked.connect(self._export_csv)
         log_actions = QHBoxLayout()
-        log_actions.addWidget(self.chk_verbose)
         log_actions.addWidget(self.chk_debug)
         log_actions.addStretch(1)
         log_actions.addWidget(btn_clear)
@@ -141,6 +148,9 @@ class ConfigureScreen(QWidget):
         self.f_min_spd .setValue(c.min_speed_mm_s)
         self.f_debounce.setValue(c.debounce_ms)
         self.f_ppm     .setValue(c.pulses_per_mm)
+        self.chk_eye_invert.blockSignals(True)
+        self.chk_eye_invert.setChecked(c.photocell_invert)
+        self.chk_eye_invert.blockSignals(False)
         idx = self.cmb_encoder.findData(c.encoder_source)
         if idx >= 0 and idx != self.cmb_encoder.currentIndex():
             self.cmb_encoder.blockSignals(True)
@@ -169,7 +179,7 @@ class ConfigureScreen(QWidget):
         return False
 
     def _on_log(self, ev: dict) -> None:
-        if self._is_routine(ev) and not self.chk_verbose.isChecked():
+        if self._is_routine(ev):     # full stream: debug mode -> debug.log
             return
         ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         self._log_rows.append((ts, ev))

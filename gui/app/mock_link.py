@@ -21,6 +21,7 @@ class MockLink(LinkBase):
         self._fault = False
         self._calibrating = False
         self._calib_resume = False
+        self._eye = False
         self._calib_gen = 0
         self._sheet_count = 0
         self._speed = 0.0
@@ -36,6 +37,7 @@ class MockLink(LinkBase):
             "pulses_per_mm": 1.0, "min_speed_mm_s": 100.0,
             "photocell_offset_mm": 250.0, "debounce_ms": 20,
             "pick_current_a": 1.0, "hold_current_a": 0.4, "encoder_source": 0,
+            "photocell_invert": False,
         }
         self._patterns: list[dict[str, Any]] = [
             {"type": "none", "elements": [], "on_timeout_ms": 1.2}
@@ -205,6 +207,8 @@ class MockLink(LinkBase):
             "active": self._active,
             "fault": self._fault,
             "calibrating": self._calibrating,
+            "eye": self._eye,
+            "in1_24v": self._eye != bool(self._config["photocell_invert"]),
             "speed_mm_s": round(self._speed, 1),
             "sheet_count": self._sheet_count,
             "queue_depth": 0,
@@ -214,6 +218,8 @@ class MockLink(LinkBase):
         if not (self._active and not self._fault):
             return
         self._sheet_count += 1
+        self._eye = True                         # sheet under the eye for a moment
+        QTimer.singleShot(300, lambda: setattr(self, "_eye", False))
         self.event_received.emit({
             "event": "pattern_event",
             "kind": "sheet_detected",

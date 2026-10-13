@@ -82,6 +82,7 @@ static Result handleSetConfig(JsonDocument& doc) {
     if (doc["pick_current_a"].is<float>())      s->pick_current_a      = doc["pick_current_a"];
     if (doc["hold_current_a"].is<float>())      s->hold_current_a      = doc["hold_current_a"];
     if (doc["encoder_source"].is<uint8_t>())    s->encoder_source      = doc["encoder_source"];
+    if (doc["photocell_invert"].is<bool>())     s->photocell_invert    = doc["photocell_invert"];
 
     const char* reason = nullptr;
     if      (s->pulses_per_mm  <= 0.0f)              reason = "bad_pulses_per_mm";

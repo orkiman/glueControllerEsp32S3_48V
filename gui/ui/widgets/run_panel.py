@@ -20,6 +20,8 @@ class RunPanel(QWidget):
         self.lbl_state  = self._value("—", "○  לא פעיל")
         self.lbl_speed  = self._value("0 mm/s", "0000 mm/s")
         self.lbl_sheets = self._value("0", "000000")
+        # Photocell (INPUT1): lit while it sees a sheet; tooltip = 24V / 0V.
+        self.lbl_eye    = self._value("—", "○  אין דף")
 
         btn_reset = QPushButton("↺")
         btn_reset.setObjectName("IconButton")
@@ -39,6 +41,9 @@ class RunPanel(QWidget):
         lay.addWidget(self._caption("דפים"))
         lay.addWidget(self.lbl_sheets)
         lay.addWidget(btn_reset)
+        lay.addWidget(self._separator())
+        lay.addWidget(self._caption("עין"))
+        lay.addWidget(self.lbl_eye)
 
         state.status_changed.connect(self._on_status)
         state.connection_changed.connect(self._on_conn)
@@ -99,10 +104,14 @@ class RunPanel(QWidget):
         self._set_button(s.active)
         self.lbl_speed.setText(f"{s.speed_mm_s:.0f} mm/s")
         self.lbl_sheets.setText(str(s.sheet_count))
+        self.lbl_eye.setText("●  דף" if s.eye else "○  אין דף")
+        self.lbl_eye.setStyleSheet("color:#22c55e;" if s.eye else "color:#9ca6b3;")
+        self.lbl_eye.setToolTip(f"INPUT1: {'24V' if s.in1_24v else '0V'}")
 
     def _on_conn(self, ok: bool, _reason: str) -> None:
         self.btn_action.setEnabled(ok)
         if not ok:
             # Values are stale without a link -- don't show a misleading state.
-            self.lbl_state.setText("—")
-            self.lbl_state.setStyleSheet("")
+            for lbl in (self.lbl_state, self.lbl_eye):
+                lbl.setText("—")
+                lbl.setStyleSheet("")

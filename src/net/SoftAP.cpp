@@ -4,6 +4,7 @@
 #include "comms/LiveSync.h"
 #include "comms/Events.h"
 #include "config/Config.h"
+#include "hw/Encoder.h"
 #include "hw/Pins.h"
 #include "rt/Control.h"
 #include "rt/GunSequencer.h"
@@ -65,6 +66,8 @@ static void sendStatus() {
     doc["active"] = cfg::g_sys.active.load(std::memory_order_acquire);
     doc["fault"] = cfg::g_sys.fault.load(std::memory_order_acquire);
     doc["calibrating"] = cfg::g_sys.calibrating.load(std::memory_order_acquire);
+    doc["eye"] = encoder::photocellSheet();          // sees a sheet
+    doc["in1_24v"] = encoder::photocellInput24v();   // electrical level
     doc["calib_result"] = rt::lastCalibResult();   // >0 ppm, 0 no pulses, <0 none
     doc["pos_mm"] = pattern::currentPosMm();
     doc["speed_mm_s"] = pattern::currentSpeedMmS();
@@ -97,6 +100,7 @@ static void sendConfig() {
     doc["pick_current_a"] = config->pick_current_a;
     doc["hold_current_a"] = config->hold_current_a;
     doc["encoder_source"] = config->encoder_source;
+    doc["photocell_invert"] = config->photocell_invert;
     String body;
     serializeJson(doc, body);
     s_server.send(200, "application/json", body);
