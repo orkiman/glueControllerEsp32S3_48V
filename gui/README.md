@@ -43,8 +43,8 @@ On the machine computer (Windows 10/11, 64-bit):
   - `glue.log` — always on, important events only (connect/disconnect,
     start/stop, setting / pattern / program changes, controller errors and
     safety trips, controller restarts and crash dumps).  Max 3 x 1 MB.
-  - `debug.log` — only in debug mode (menu *קובץ → מצב דיבאג*, or
-    `--debug`): all traffic including the 5 Hz status stream.  Debug mode is
+  - `debug.log` — only in debug mode (Settings tab → event log →
+    *מצב דיבאג*, or `--debug`): all traffic including the 5 Hz status stream.  Debug mode is
     off at every start and the file is cleared when the program opens.
 - First run: Windows SmartScreen may warn (the exe is unsigned) —
   *More info → Run anyway*.

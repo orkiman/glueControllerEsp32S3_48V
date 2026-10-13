@@ -2,11 +2,9 @@
 tabbed screens."""
 from __future__ import annotations
 
-from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (QMainWindow, QSizePolicy, QTabWidget,
                                QVBoxLayout, QWidget)
 
-from app import logs
 from app import protocol as proto
 from app.state import AppState
 from ui.screens.configure import ConfigureScreen
@@ -45,8 +43,6 @@ class MainWindow(QMainWindow):
         self.patterns_screen = PatternsScreen(state)
         self.tabs.addTab(self.patterns_screen, "תוכנית")
         self.tabs.addTab(ConfigureScreen(state), "הגדרות")
-
-        self._build_menu()
 
         # ---- header: run controls + connection, then program bar ----
         self.program_bar = ProgramBar(state, self._refresh_from_state)
@@ -105,30 +101,6 @@ class MainWindow(QMainWindow):
         # down; otherwise Qt prints "QThread destroyed while still running".
         self.state.link.close()
         event.accept()
-
-    # ---- menu ---------------------------------------------------------------
-    def _build_menu(self) -> None:
-        mb = self.menuBar()
-        m_file = mb.addMenu("&קובץ")
-
-        # Off at every start (see app/logs.py); not saved between runs.
-        self.act_debug = QAction("מצב דיבאג (לוג מלא)", self)
-        self.act_debug.setCheckable(True)
-        self.act_debug.setChecked(logs.debug_enabled())
-        self.act_debug.toggled.connect(self._toggle_debug)
-        m_file.addAction(self.act_debug)
-
-        m_file.addSeparator()
-        act_quit = QAction("יציאה", self)
-        act_quit.setShortcut(QKeySequence.Quit)
-        act_quit.triggered.connect(self.close)
-        m_file.addAction(act_quit)
-
-    def _toggle_debug(self, on: bool) -> None:
-        logs.set_debug(on)
-        self.statusBar().showMessage(
-            f"מצב דיבאג פעיל — כל התעבורה נרשמת ל-{logs.debug_path()}" if on
-            else "מצב דיבאג כבוי", 6000)
 
     def _refresh_from_state(self) -> None:
         """Re-sync the pattern editor and toolbars from the current state

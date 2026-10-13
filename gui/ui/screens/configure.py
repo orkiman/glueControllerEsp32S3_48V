@@ -3,7 +3,7 @@
   - Solenoid currents + hold time (operator-facing)
   - Global motion params (photocell offset, min speed, debounce, pulses/mm)
   - Encoder calibration
-  - Event log (with CSV export)
+  - Event log (with CSV export) and the debug-mode switch (full file log)
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout,
                                QPlainTextEdit, QPushButton, QVBoxLayout,
                                QWidget)
 
+from app import logs
 from app import protocol as proto
 from app.state import AppState, RuntimeConfig
 from ui.widgets.numeric_field import NumericField
@@ -91,12 +92,20 @@ class ConfigureScreen(QWidget):
 
         self.chk_verbose = QCheckBox("הצג סטטוס שוטף")
         self.chk_verbose.setChecked(False)
+        # Full traffic to debug.log.  Off at every start (see app/logs.py).
+        self.chk_debug = QCheckBox("מצב דיבאג (לוג מלא לקובץ)")
+        self.chk_debug.setChecked(logs.debug_enabled())
+        self.chk_debug.setToolTip(
+            f"רושם את כל התעבורה ל-{logs.debug_path()}\n"
+            "נכבה והקובץ מתאפס בכל פתיחה של התוכנה.")
+        self.chk_debug.toggled.connect(logs.set_debug)
         btn_clear  = QPushButton("נקה")
         btn_clear.clicked.connect(self._clear_log)
         btn_export = QPushButton("ייצוא CSV…")
         btn_export.clicked.connect(self._export_csv)
         log_actions = QHBoxLayout()
         log_actions.addWidget(self.chk_verbose)
+        log_actions.addWidget(self.chk_debug)
         log_actions.addStretch(1)
         log_actions.addWidget(btn_clear)
         log_actions.addWidget(btn_export)
