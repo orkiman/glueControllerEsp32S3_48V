@@ -5,8 +5,10 @@ gun). Each pattern element is a draggable segment with two endpoint handles.
 For dots patterns the spacing is rendered as evenly-spaced dots inside the
 segment, and adjustable with the mouse wheel.
 
-Coordinates: scene X = millimetres * PX_PER_MM; scene Y = lane_index * LANE_H.
-All mm <-> px conversion is funnelled through `mm_to_px` / `px_to_mm`.
+Coordinates: scene X = millimetres * px-per-mm; scene Y = lane_index * LANE_H.
+All mm <-> px conversion is funnelled through `mm_to_px` / `px_to_mm`.  The
+scale is set on every scene rebuild so the canvas fills the view width (a
+short pattern is shown large); it never changes in the middle of a drag.
 """
 from __future__ import annotations
 
@@ -23,7 +25,6 @@ from app import protocol as proto
 # -----------------------------------------------------------------------------
 # Layout constants
 # -----------------------------------------------------------------------------
-PX_PER_MM           = 1.6
 LANE_H              = 110
 LANE_PAD            = 8
 HANDLE_R            = 7
@@ -32,11 +33,13 @@ LANE_TITLE_H        = 14                  # space at lane top for "אקדח N"
 SEG_BODY_HEIGHT     = LANE_H - 2 * LANE_PAD - LANE_TITLE_H - LABEL_STRIP_H
 SNAP_MM             = 0.5
 # Canvas (display only — never exposed to the user as "paper length").  We
-# auto-size to fit the rightmost segment plus a margin, but never below
-# MIN_CANVAS_MM and never above MAX_CANVAS_MM (defensive cap).
-MIN_CANVAS_MM       = 400.0
-CANVAS_MARGIN_MM    = 100.0
+# auto-size to fit the rightmost segment plus a margin (20 % of it, 10..100 mm),
+# but never below MIN_CANVAS_MM and never above MAX_CANVAS_MM (defensive cap).
+MIN_CANVAS_MM       = 100.0
+CANVAS_MARGIN_MM    = 100.0               # largest margin
 MAX_CANVAS_MM       = 5000.0
+RULER_MIN_GAP_PX    = 45                  # ruler labels at least this far apart
+MIN_PX_PER_MM       = 1.6                 # below this, scroll instead of shrinking
 DEFAULT_NEW_LEN_MM  = 30.0
 DEFAULT_SPACING_MM  = 5.0
 
@@ -48,12 +51,16 @@ GUN_COLORS = [
 ]
 
 
+# Current scale; set by PatternEditorView._rebuild_scene (one editor exists).
+_px_per_mm = MIN_PX_PER_MM
+
+
 def mm_to_px(mm: float) -> float:
-    return mm * PX_PER_MM
+    return mm * _px_per_mm
 
 
 def px_to_mm(px: float) -> float:
-    return px / PX_PER_MM
+    return px / _px_per_mm
 
 
 def snap(mm: float) -> float:
@@ -433,11 +440,25 @@ class PatternEditorView(QGraphicsView):
 
     def _clamp_canvas(self, max_end: float) -> float:
         """Smallest canvas wide enough to show `max_end` plus margin, clamped
-        to [MIN_CANVAS_MM, MAX_CANVAS_MM] and rounded up to the nearest
-        50 mm so the ruler ticks line up neatly."""
-        target = max(MIN_CANVAS_MM, max_end + CANVAS_MARGIN_MM)
+        to [MIN_CANVAS_MM, MAX_CANVAS_MM] and rounded up (10 mm below 500 mm,
+        else 50 mm) so the ruler ticks line up neatly."""
+        margin = min(CANVAS_MARGIN_MM, max(10.0, 0.2 * max_end))
+        target = max(MIN_CANVAS_MM, max_end + margin)
         target = min(MAX_CANVAS_MM, target)
-        return float(int((target + 49.999) / 50.0) * 50)
+        unit = 10.0 if target < 500.0 else 50.0
+        return float(int((target + unit - 0.001) / unit) * unit)
+
+    def _fit_scale(self, canvas_mm: float) -> float:
+        """px per mm so `canvas_mm` fills the view width; long canvases keep
+        the old 1.6 px/mm and scroll instead of squeezing the labels."""
+        avail = max(200, self.viewport().width() - 30)
+        return max(MIN_PX_PER_MM, avail / canvas_mm)
+
+    def resizeEvent(self, ev) -> None:  # noqa: N802
+        super().resizeEvent(ev)
+        # Refit after a window resize (deferred, like other rebuilds).
+        if abs(self._fit_scale(self._cur_canvas_mm) - _px_per_mm) > 0.01 * _px_per_mm:
+            QTimer.singleShot(0, self._rebuild_scene)
 
     def _canvas_length_mm(self) -> float:
         max_end = 0.0
@@ -501,6 +522,8 @@ class PatternEditorView(QGraphicsView):
                     max_end = e_mm
         canvas_mm = self._clamp_canvas(max_end)
         self._cur_canvas_mm = canvas_mm
+        global _px_per_mm
+        _px_per_mm = self._fit_scale(canvas_mm)
         w = mm_to_px(canvas_mm)
         h = self._lane_y(proto.NUM_GUNS) + 8
         self._scene.setSceneRect(QRectF(-10, -4, w + 20, h + 8))
@@ -513,7 +536,9 @@ class PatternEditorView(QGraphicsView):
 
         ruler_y = 18
         self._scene.addLine(0, ruler_y, w, ruler_y, ruler_pen)
-        for mm in range(0, int(canvas_mm) + 1, 50):
+        step = next((s for s in (5, 10, 20, 25, 50, 100, 200, 250, 500, 1000)
+                     if s * _px_per_mm >= RULER_MIN_GAP_PX), 1000)
+        for mm in range(0, int(canvas_mm) + 1, step):
             x = mm_to_px(mm)
             self._scene.addLine(x, ruler_y - 4, x, ruler_y, tick_pen)
             t = self._scene.addText(f"{mm}", font)

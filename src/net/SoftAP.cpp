@@ -101,6 +101,7 @@ static void sendConfig() {
     doc["hold_current_a"] = config->hold_current_a;
     doc["encoder_source"] = config->encoder_source;
     doc["photocell_invert"] = config->photocell_invert;
+    doc["calib_paper_mm"] = config->calib_paper_mm;
     String body;
     serializeJson(doc, body);
     s_server.send(200, "application/json", body);

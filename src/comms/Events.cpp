@@ -122,6 +122,7 @@ static void emitterTask(void*) {
                 doc["hold_current_a"]       = evConfig.hold_current_a;
                 doc["encoder_source"]       = evConfig.encoder_source;
                 doc["photocell_invert"]     = evConfig.photocell_invert;
+                doc["calib_paper_mm"]       = evConfig.calib_paper_mm;
                 break;
             case Kind::Pattern: {
                 uint8_t gun = e.b1;          // 1-based

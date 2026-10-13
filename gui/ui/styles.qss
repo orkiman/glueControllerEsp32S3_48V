@@ -129,6 +129,15 @@ ConnectionBar, ProgramBar { border-bottom: 1px solid #2d333b; }
 RunPanel QPushButton#PrimaryButton,
 RunPanel QPushButton#DangerButton { padding: 6px 18px; }
 QPushButton#IconButton { padding: 4px 10px; font-size: 13pt; }
+QPushButton#AdminButton { padding: 6px 12px; }
+
+/* Disabled fields (e.g. settings locked outside admin mode) must look it. */
+QLabel:disabled, QCheckBox:disabled { color: #6b727c; }
+QDoubleSpinBox:disabled, QSpinBox:disabled, QComboBox:disabled, QLineEdit:disabled {
+    color: #6b727c;
+    background-color: #1a1d22;
+    border-color: #262b32;
+}
 QLabel#HeaderValue   { font-size: 14pt; font-weight: 700; }
 QLabel#HeaderCaption { color: #9ca6b3; font-size: 10pt; }
 QFrame#HeaderSeparator { background-color: #3a414b; border: none; margin: 4px 6px; }

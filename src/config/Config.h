@@ -66,6 +66,8 @@ struct RuntimeConfig {
     // LOW.  false: a sheet = 24V present (sensor switches on at the sheet).
     // true: a sheet = no 24V (sensor switches off at the sheet).
     bool     photocell_invert      = false;
+    // Known sheet length for calibration (remembered for the next one).
+    float    calib_paper_mm        = 297.0f;
 
     // ---- per-gun pattern (includes per-gun on_timeout_ms / droplet size) ----
     GunPattern pattern[pins::NUM_GUNS];

@@ -258,6 +258,13 @@ connect and after `ready`, and never pushes its local defaults.
 The UART line limit and the web command body limit are 4096 bytes, so a full
 64-element pattern fits.
 
+### 7.1e Calibration sheet length
+
+- Config `calib_paper_mm` (default 297): the known sheet length for
+  calibration, kept on the controller (set_config, config event,
+  `/api/config`, saved with the program; optional on load) so the GUI and
+  the web page show the last value.
+
 ### 7.1d Photocell (INPUT1) polarity and live state
 
 - Hardware: INPUT1 drives a TLP291 channel whose collector pulls GPIO1 down
@@ -338,7 +345,8 @@ Example payload:
 | Multi-program management | `ui/widgets/program_bar.py` — the program store lives on the controller (SPIFFS) and is shared with the web UI; dropdown, save, save-as, new, delete; edits autosave 2 s after the last change, also while running |
 | Event log filtering | Routine `status` and `ping_ack` events never shown in the panel (full stream: debug mode → `debug.log`); live values are in the header |
 | Outbound command log | All `_send()` calls (except ping) appear in the event log |
-| Dynamic canvas | Canvas grows automatically when a segment is dragged or added outside current bounds |
+| Dynamic canvas | Canvas grows automatically when a segment is dragged or added outside current bounds; minimum 100 mm (was 400), margin 20 % of the pattern (10..100 mm); fills the view width (zoomed in for short patterns), long patterns keep 1.6 px/mm and scroll; ruler step adapts.  Web previews use the same minimum |
+| Admin mode | Settings tab (currents, globals, eye logic, calibration) locked unless admin: password 1234 (shown in the prompt — only against accidental changes), 10 min with countdown, exit button in the header and on the Settings tab.  Programs, patterns, start/stop, tests, event log stay open; cancelling a running calibration is always allowed.  Web settings screen: same, per browser tab |
 | Overlap prevention | Drag, handle resize, and double-click add all prevent segment overlap |
 | Hebrew RTL fixes | Group-box title padding widened; lane labels use document margin |
 | Encoder calibration | Calibration mode (see §7.1c): arm / cancel button, blue banner + "קליברציה" state in the header, result / failure banner |
@@ -389,6 +397,9 @@ cd gui
      ~200 ms and re-opens when the conveyor moves.
   6. Test buttons still work; `peak` debug events show time-to-peak.
   7. Settings: pick above 1.5 A is refused.
+- **TO CHECK — after flashing (2026-10-13 batch):** calibration sheet
+  length is remembered (GUI and web, after a restart); Settings locked
+  until admin (1234), 10 min, exit; pattern canvas 100 mm minimum.
 - **TO CHECK — test duration up to 30 s (2026-10-13, built + IRAM check
   clean, NOT yet flashed: controller was disconnected).**  test_open accepts
   1..30000 ms (was 10000); sequencer MAX_ON_US 30 s (production never near

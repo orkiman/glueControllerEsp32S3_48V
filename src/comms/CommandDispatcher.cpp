@@ -83,6 +83,7 @@ static Result handleSetConfig(JsonDocument& doc) {
     if (doc["hold_current_a"].is<float>())      s->hold_current_a      = doc["hold_current_a"];
     if (doc["encoder_source"].is<uint8_t>())    s->encoder_source      = doc["encoder_source"];
     if (doc["photocell_invert"].is<bool>())     s->photocell_invert    = doc["photocell_invert"];
+    if (doc["calib_paper_mm"].is<float>())      s->calib_paper_mm      = doc["calib_paper_mm"];
 
     const char* reason = nullptr;
     if      (s->pulses_per_mm  <= 0.0f)              reason = "bad_pulses_per_mm";
@@ -91,6 +92,7 @@ static Result handleSetConfig(JsonDocument& doc) {
     else if (s->hold_current_a <= 0.0f)              reason = "bad_hold_current";
     else if (s->hold_current_a >= s->pick_current_a) reason = "hold_ge_pick";
     else if (s->encoder_source > 1)                  reason = "bad_encoder_source";
+    else if (s->calib_paper_mm <= 0.0f)              reason = "bad_paper_length";
     if (reason) {
         // Rejected: re-send the unchanged config so the PC drops its local edit.
         if (s_src == livesync::Source::Uart) evt::postConfig(cfg::Config::active());

@@ -165,6 +165,7 @@ static bool writeProgramFile(uint8_t id, const cfg::RuntimeConfig* config, const
     cfgObj["hold_current_a"]      = config->hold_current_a;
     cfgObj["encoder_source"]      = config->encoder_source;
     cfgObj["photocell_invert"]    = config->photocell_invert;
+    cfgObj["calib_paper_mm"]      = config->calib_paper_mm;
 
     JsonArray patterns = doc["patterns"].to<JsonArray>();
     for (uint8_t g = 0; g < pins::NUM_GUNS; ++g) {
@@ -237,6 +238,8 @@ static bool validateAndParse(JsonDocument& doc, cfg::RuntimeConfig& out, char* n
     out.encoder_source       = encSrc;
     // Optional: programs saved before the setting existed use the default.
     out.photocell_invert     = cfgObj["photocell_invert"] | false;
+    float paperMm            = cfgObj["calib_paper_mm"] | 297.0f;
+    out.calib_paper_mm       = paperMm > 0.0f ? paperMm : 297.0f;
 
     JsonArrayConst patterns = doc["patterns"].as<JsonArrayConst>();
     if (patterns.isNull() || patterns.size() != pins::NUM_GUNS) return false;

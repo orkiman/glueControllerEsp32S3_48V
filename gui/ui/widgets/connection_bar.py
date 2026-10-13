@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QPushButton,
 
 from app.serial_link import SerialLink, list_ports
 from app.state import AppState
+from ui.widgets.admin_button import AdminButton
 
 
 SETTINGS = QSettings("orkiman", "glue_controller")
@@ -69,6 +70,8 @@ class ConnectionBar(QWidget):
         if leading is not None:
             lay.addWidget(leading)
         lay.addStretch(1)
+        lay.addWidget(AdminButton(state.admin))   # admin mode, visible on every screen
+        lay.addSpacing(12)
         lay.addWidget(self.led)
         lay.addWidget(self.status_label)
         lay.addSpacing(12)

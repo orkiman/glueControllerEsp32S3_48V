@@ -37,7 +37,7 @@ class MockLink(LinkBase):
             "pulses_per_mm": 1.0, "min_speed_mm_s": 100.0,
             "photocell_offset_mm": 250.0, "debounce_ms": 20,
             "pick_current_a": 1.0, "hold_current_a": 0.4, "encoder_source": 0,
-            "photocell_invert": False,
+            "photocell_invert": False, "calib_paper_mm": 297.0,
         }
         self._patterns: list[dict[str, Any]] = [
             {"type": "none", "elements": [], "on_timeout_ms": 1.2}

@@ -13,13 +13,14 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout,
-                               QGridLayout, QGroupBox, QHBoxLayout,
+                               QGridLayout, QGroupBox, QHBoxLayout, QLabel,
                                QPlainTextEdit, QPushButton, QVBoxLayout,
                                QWidget)
 
 from app import logs
 from app import protocol as proto
 from app.state import AppState, LiveStatus, RuntimeConfig
+from ui.widgets.admin_button import AdminButton
 from ui.widgets.numeric_field import NumericField
 
 
@@ -74,6 +75,8 @@ class ConfigureScreen(QWidget):
         self.f_paper = NumericField("אורך דף ידוע (לקליברציה)", "mm",
                                     10.0, 2000.0, 1.0, 1)
         self.f_ppm.bind(lambda v: state.push_config(pulses_per_mm=v))
+        # Kept on the controller (shared with the web page and next runs).
+        self.f_paper.bind(lambda v: state.push_config(calib_paper_mm=v))
         # Arms calibration mode; while the controller reports `calibrating`
         # the same button cancels it (see _on_status).
         self.btn_cal = QPushButton("דרוך קליברציה")
@@ -124,6 +127,16 @@ class ConfigureScreen(QWidget):
         log_lay.addWidget(self.log, 1)
         log_lay.addLayout(log_actions)
 
+        # ---- Admin lock (settings only; the event log stays usable) ---------
+        self.lbl_lock = QLabel()
+        self.lbl_lock.setObjectName("StatCaption")
+        lock_row = QHBoxLayout()
+        lock_row.addWidget(self.lbl_lock)
+        lock_row.addStretch(1)
+        lock_row.addWidget(AdminButton(state.admin))
+        self._locked_boxes = (op_box, glob_box)
+        self._locked_cal = (self.f_ppm, self.f_paper, self.cmb_encoder)
+
         # ---- Compose -------------------------------------------------------
         top = QGridLayout()
         top.addWidget(op_box,   0, 0)
@@ -131,14 +144,17 @@ class ConfigureScreen(QWidget):
         top.addWidget(cal_box,  0, 2)
 
         root = QVBoxLayout(self)
+        root.addLayout(lock_row)
         root.addLayout(top)
         root.addWidget(log_box, 1)
 
+        state.admin.changed.connect(lambda _on: self._apply_lock())
         state.config_changed.connect(self._on_config)
         state.status_changed.connect(self._on_status)
         state.log_appended.connect(self._on_log)
         state.command_sent.connect(self._on_command_sent)
         self._on_config(state.config)
+        self._apply_lock()
 
     # ---- handlers ----------------------------------------------------------
     def _on_config(self, c: RuntimeConfig) -> None:
@@ -148,6 +164,7 @@ class ConfigureScreen(QWidget):
         self.f_min_spd .setValue(c.min_speed_mm_s)
         self.f_debounce.setValue(c.debounce_ms)
         self.f_ppm     .setValue(c.pulses_per_mm)
+        self.f_paper   .setValue(c.calib_paper_mm)
         self.chk_eye_invert.blockSignals(True)
         self.chk_eye_invert.setChecked(c.photocell_invert)
         self.chk_eye_invert.blockSignals(False)
@@ -167,6 +184,18 @@ class ConfigureScreen(QWidget):
         if s.calibrating != self._calibrating:
             self._calibrating = s.calibrating
             self.btn_cal.setText("בטל קליברציה" if s.calibrating else "דרוך קליברציה")
+            self._apply_lock()
+
+    def _apply_lock(self) -> None:
+        admin = self.state.admin.active
+        for w in (*self._locked_boxes, *self._locked_cal):
+            w.setEnabled(admin)
+        # Cancelling a running calibration is always allowed.
+        self.btn_cal.setEnabled(admin or self._calibrating)
+        self.lbl_lock.setText(
+            "🔓  מצב מנהל — אפשר לשנות הגדרות. ננעל אוטומטית בסיום הזמן."
+            if admin else
+            "🔒  ההגדרות נעולות לשינוי. לשינוי: כניסת מנהל עם סיסמה.")
 
     def _is_routine(self, ev: dict) -> bool:
         """High-frequency, low-signal traffic that clutters the log:

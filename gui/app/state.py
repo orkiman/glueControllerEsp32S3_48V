@@ -17,6 +17,7 @@ from typing import Any
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from . import protocol as proto
+from .admin import AdminMode
 from .link_base import LinkBase
 
 
@@ -54,6 +55,7 @@ class RuntimeConfig:
     encoder_source: int        = 0
     # Eye on INPUT1: False = a sheet is 24V present, True = a sheet is 0V.
     photocell_invert: bool     = False
+    calib_paper_mm: float      = 297.0   # known sheet length for calibration
 
 
 @dataclass
@@ -88,6 +90,7 @@ class AppState(QObject):
         self.status   = LiveStatus()
         self.programs: list[dict[str, Any]] = []   # controller program index
         self.active_program_id: int = 0
+        self.admin = AdminMode()                   # settings need the password
         # (active, fault, calibrating) last written to glue.log; None = unknown.
         self._logged_state: tuple[bool, bool, bool] | None = None
 
@@ -229,6 +232,7 @@ class AppState(QObject):
             self.config.hold_current_a        = float(ev["hold_current_a"])
             self.config.encoder_source      = int(ev["encoder_source"])
             self.config.photocell_invert    = bool(ev.get("photocell_invert", False))
+            self.config.calib_paper_mm      = float(ev.get("calib_paper_mm", 297.0))
             self.config_changed.emit(self.config)
         except (KeyError, ValueError, TypeError):
             pass

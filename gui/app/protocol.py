@@ -47,11 +47,11 @@ def cmd_set_active(active: bool) -> dict[str, Any]:
 def cmd_set_config(**fields: float) -> dict[str, Any]:
     """Pass any subset of: pulses_per_mm, min_speed_mm_s, photocell_offset_mm,
     debounce_ms, pick_current_a, hold_current_a, encoder_source,
-    photocell_invert."""
+    photocell_invert, calib_paper_mm."""
     allowed = {
         "pulses_per_mm", "min_speed_mm_s", "photocell_offset_mm",
         "debounce_ms", "pick_current_a", "hold_current_a", "encoder_source",
-        "photocell_invert",
+        "photocell_invert", "calib_paper_mm",
     }
     bad = set(fields) - allowed
     if bad:
