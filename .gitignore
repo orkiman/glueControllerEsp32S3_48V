@@ -30,3 +30,9 @@ hardware/myLibs/**/*.bak
 
 # GUI runtime log
 gui/debug.log
+gui/debug.log.*
+
+# GUI standalone build (gui/build_exe.ps1)
+gui/build/
+gui/dist/
+gui/*.spec

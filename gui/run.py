@@ -5,6 +5,7 @@ import argparse
 import logging
 import os
 import sys
+from logging.handlers import RotatingFileHandler
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -18,12 +19,18 @@ from ui.theme import apply_dark_theme
 
 
 def main() -> int:
-    log_path = os.path.join(os.path.dirname(__file__), "debug.log")
+    # Frozen (PyInstaller .exe): __file__ is inside a temp folder deleted on
+    # exit, so keep the log next to the .exe instead.
+    base = (os.path.dirname(sys.executable) if getattr(sys, "frozen", False)
+            else os.path.dirname(__file__))
+    log_path = os.path.join(base, "debug.log")
+    # Status events are logged at 5 Hz all day: cap the log at 3 x 5 MB.
+    handler = RotatingFileHandler(log_path, maxBytes=5 * 1024 * 1024,
+                                  backupCount=2, encoding="utf-8")
     logging.basicConfig(
-        filename=log_path,
+        handlers=[handler],
         level=logging.DEBUG,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
-        encoding="utf-8",
         force=True,
     )
 

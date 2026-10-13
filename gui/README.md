@@ -24,11 +24,28 @@ python run.py            # real serial
 python run.py --mock     # in-process fake firmware, no hardware needed
 ```
 
-## Packaging (later)
+## Standalone .exe (machine computer)
+
+Build (once per GUI change):
 
 ```powershell
-pyinstaller --noconsole --onefile run.py -n GlueController
+pip install pyinstaller          # inside the venv, one time
+powershell -ExecutionPolicy Bypass -File build_exe.ps1
 ```
+
+Output: `dist\GlueController.exe` — a single file, no Python needed on the
+target.  The theme (`ui/styles.qss`) is bundled.
+
+On the machine computer (Windows 10/11, 64-bit):
+
+- Copy `GlueController.exe` into its own folder (e.g. `C:\GlueController\`);
+  `debug.log` is written next to it (capped at 3 x 5 MB).
+- First run: Windows SmartScreen may warn (the exe is unsigned) —
+  *More info → Run anyway*.
+- The CP210x USB-UART driver must be present (Windows Update usually installs
+  it when the controller is plugged in).  The app auto-connects to the last
+  used COM port; pick it once from the port list.
+- Programs and settings live on the controller, so nothing else is copied.
 
 ## Layout
 
