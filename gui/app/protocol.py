@@ -15,6 +15,8 @@ NUM_GUNS = 4
 MAX_ELEMENTS_PER_GUN = 64
 # Firmware limit (cfg::MAX_PICK_CURRENT_A): the current sense cannot see more.
 MAX_PICK_CURRENT_A = 1.5
+# Firmware limit for test_open (operator-set test duration).
+MAX_TEST_MS = 30000
 
 
 class PatternType(str, Enum):
@@ -87,8 +89,8 @@ def cmd_set_pattern(gun_1based: int, ptype: PatternType,
 def cmd_test_open(gun_1based: int, timeout_ms: int = 1000) -> dict[str, Any]:
     if not 0 <= gun_1based <= NUM_GUNS:
         raise ValueError(f"gun out of range: {gun_1based}")
-    if not 1 <= timeout_ms <= 10000:
-        raise ValueError("timeout_ms must be 1..10000")
+    if not 1 <= timeout_ms <= MAX_TEST_MS:
+        raise ValueError(f"timeout_ms must be 1..{MAX_TEST_MS}")
     return {"cmd": "test_open", "gun": gun_1based, "timeout_ms": timeout_ms}
 
 

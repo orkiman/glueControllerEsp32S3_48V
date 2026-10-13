@@ -381,6 +381,12 @@ cd gui
      ~200 ms and re-opens when the conveyor moves.
   6. Test buttons still work; `peak` debug events show time-to-peak.
   7. Settings: pick above 1.5 A is refused.
+- **TO CHECK — test duration up to 30 s (2026-10-13, built + IRAM check
+  clean, NOT yet flashed: controller was disconnected).**  test_open accepts
+  1..30000 ms (was 10000); sequencer MAX_ON_US 30 s (production never near
+  it).  GUI: "משך בדיקה" field on the program screen (1-30 s, remembered);
+  web: field on the test screen.  After flashing: a 15-30 s lines test stays
+  open the whole time; 31 s is refused (bad_timeout).
 - **TO CHECK — photocell polarity (2026-10-13).**  Put a sheet in front of
   the eye: header "עין" must light ("● דף").  If it lights without a sheet
   and goes dark with one, tick "הפוך לוגיקת עין" in Settings.  Then check

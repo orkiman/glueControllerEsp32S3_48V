@@ -1,7 +1,9 @@
 """Patterns screen — per-gun toolbar + multi-lane visual editor."""
 from __future__ import annotations
 
-from PySide6.QtCore import QTimer
+from typing import Callable
+
+from PySide6.QtCore import QSettings, QTimer
 from PySide6.QtWidgets import (QComboBox, QGridLayout, QGroupBox, QHBoxLayout,
                                QLabel, QPushButton, QVBoxLayout, QWidget)
 
@@ -10,6 +12,9 @@ from app.state import AppState, GunPattern
 from ui.widgets.numeric_field import NumericField
 from ui.widgets.pattern_editor import GUN_COLORS, PatternEditorView
 
+
+SETTINGS = QSettings("orkiman", "glue_controller")
+TEST_SECONDS_KEY = "test_seconds"     # operator's test duration, kept between runs
 
 _TYPE_LABEL = {
     proto.PatternType.NONE:  "ללא",
@@ -22,11 +27,13 @@ class GunToolbar(QGroupBox):
     """Per-gun compact toolbar above the editor."""
 
     def __init__(self, gun_idx: int, state: AppState,
-                 editor: PatternEditorView) -> None:
+                 editor: PatternEditorView,
+                 test_ms: Callable[[], int]) -> None:
         super().__init__(f"אקדח {gun_idx + 1}")
         self.gun_idx = gun_idx
         self.state   = state
         self.editor  = editor
+        self._test_ms = test_ms           # current test duration (shared field)
 
         color = GUN_COLORS[gun_idx]
         self.setStyleSheet(
@@ -128,8 +135,9 @@ class GunToolbar(QGroupBox):
         gun_1based = self.gun_idx + 1
         self.btn_test.setText("עצור" if on else "בדיקה")
         if on:
-            self.state.test_open(gun_1based, timeout_ms=5000)
-            self._test_timer.start(5000)
+            ms = self._test_ms()
+            self.state.test_open(gun_1based, timeout_ms=ms)
+            self._test_timer.start(ms)
         else:
             self._test_timer.stop()
             self.state.test_close(gun_1based)
@@ -153,11 +161,25 @@ class PatternsScreen(QWidget):
         self.state  = state
         self.editor = PatternEditorView()
 
+        # One test duration for all guns' "בדיקה" buttons, 1..30 s.
+        max_s = proto.MAX_TEST_MS // 1000
+        self.f_test_s = NumericField("משך בדיקה", "שניות", 1, max_s, 1,
+                                     integer=True)
+        self.f_test_s.setValue(min(max_s, max(1, int(SETTINGS.value(TEST_SECONDS_KEY, 5)))))
+        self.f_test_s.bind(lambda v: SETTINGS.setValue(TEST_SECONDS_KEY, int(v)))
+        self.f_test_s.setToolTip(
+            "כמה זמן לחיצה על 'בדיקה' מפעילה את האקדח. "
+            "בקווים האקדח פתוח ברצף כל הזמן הזה; בנקודות — 20 טיפות בשנייה.")
+        test_row = QHBoxLayout()
+        test_row.addWidget(self.f_test_s)
+        test_row.addStretch(1)
+
         grid = QGridLayout()
         grid.setHorizontalSpacing(8)
         self.toolbars: list[GunToolbar] = []
         for i in range(proto.NUM_GUNS):
-            tb = GunToolbar(i, state, self.editor)
+            tb = GunToolbar(i, state, self.editor,
+                            lambda: int(self.f_test_s.value()) * 1000)
             self.toolbars.append(tb)
             grid.addWidget(tb, 0, i)
 
@@ -169,6 +191,7 @@ class PatternsScreen(QWidget):
         hint.setObjectName("StatCaption")
 
         root = QVBoxLayout(self)
+        root.addLayout(test_row)
         root.addLayout(grid)
         root.addWidget(self.editor, 1)
         root.addWidget(hint)

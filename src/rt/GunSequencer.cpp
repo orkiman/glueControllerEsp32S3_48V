@@ -21,7 +21,9 @@ static constexpr float    NEAR_ZERO_V          = 0.10f;
 
 static constexpr int64_t  NEVER                = INT64_MAX;
 static constexpr int64_t  MIN_ON_US            = 50;
-static constexpr int64_t  MAX_ON_US            = 10'000'000;
+// Longest single opening.  Production never comes near it (lines: 5 s
+// ceiling, dots: ms); only test_open lines (up to 30 s) use the range.
+static constexpr int64_t  MAX_ON_US            = 30'000'000;
 static constexpr int64_t  ALARM_SLACK_US       = 2;      // close alarm runs on its own 1 MHz clock
 static constexpr int64_t  SUPERVISOR_GRACE_US  = 100;    // supervisor closes what the alarm missed
 static constexpr int64_t  CHECKER_GRACE_US     = 2000;   // Core 0 last resort
