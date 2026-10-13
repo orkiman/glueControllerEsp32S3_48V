@@ -3,11 +3,10 @@ tabbed screens."""
 from __future__ import annotations
 
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import (QFileDialog, QMainWindow, QMessageBox,
-                               QSizePolicy, QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QMainWindow, QSizePolicy, QTabWidget,
+                               QVBoxLayout, QWidget)
 
 from app import logs
-from app import profiles
 from app import protocol as proto
 from app.state import AppState
 from ui.screens.configure import ConfigureScreen
@@ -112,17 +111,6 @@ class MainWindow(QMainWindow):
         mb = self.menuBar()
         m_file = mb.addMenu("&קובץ")
 
-        act_load = QAction("טען פרופיל…", self)
-        act_load.setShortcut(QKeySequence.Open)
-        act_load.triggered.connect(self._load_profile)
-        m_file.addAction(act_load)
-
-        act_save = QAction("שמור פרופיל…", self)
-        act_save.setShortcut(QKeySequence.Save)
-        act_save.triggered.connect(self._save_profile)
-        m_file.addAction(act_save)
-
-        m_file.addSeparator()
         # Off at every start (see app/logs.py); not saved between runs.
         self.act_debug = QAction("מצב דיבאג (לוג מלא)", self)
         self.act_debug.setCheckable(True)
@@ -142,33 +130,9 @@ class MainWindow(QMainWindow):
             f"מצב דיבאג פעיל — כל התעבורה נרשמת ל-{logs.debug_path()}" if on
             else "מצב דיבאג כבוי", 6000)
 
-    def _save_profile(self) -> None:
-        path, _ = QFileDialog.getSaveFileName(
-            self, "שמירת פרופיל", "profile.json", "JSON (*.json)")
-        if not path:
-            return
-        try:
-            profiles.save_to(path, self.state)
-            self.statusBar().showMessage(f"נשמר: {path}", 4000)
-        except OSError as exc:
-            QMessageBox.warning(self, "שגיאת שמירה", str(exc))
-
-    def _load_profile(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "טעינת פרופיל", "", "JSON (*.json)")
-        if not path:
-            return
-        try:
-            profiles.load_from(path, self.state)
-        except (OSError, ValueError) as exc:
-            QMessageBox.warning(self, "שגיאת טעינה", str(exc))
-            return
-        self._refresh_from_state()
-        self.statusBar().showMessage(f"נטען: {path}", 4000)
-
     def _refresh_from_state(self) -> None:
         """Re-sync the pattern editor and toolbars from the current state
-        (used after loading a profile file or switching programs)."""
+        (used after switching programs)."""
         for i in range(len(self.state.patterns)):
             gp = self.state.patterns[i]
             self.patterns_screen.editor.load_pattern(i, gp.type, gp.elements)

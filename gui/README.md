@@ -64,7 +64,6 @@ gui/
     serial_link.py             pyserial implementation
     mock_link.py               in-process fake firmware
     state.py                   central app state (config, patterns, status)
-    profiles.py                save/load profile JSONs
   ui/
     theme.py                   palette + QSS loader
     styles.qss                 dark industrial theme
