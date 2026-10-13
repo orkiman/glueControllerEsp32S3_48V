@@ -88,15 +88,22 @@ void service() {
     uint32_t bits = s_calibBits.load(std::memory_order_acquire);
     float ppm;
     std::memcpy(&ppm, &bits, sizeof(ppm));
-    if (!(ppm > 0.0f)) return;
 
     Guard g;
-    cfg::RuntimeConfig* s = cfg::Config::editScratch();
-    s->pulses_per_mm = ppm;
-    cfg::Config::publish();
-    rt::onConfigApplied();
-    prog::markDirty();
-    configChanged(Source::Internal);
+    // Cancelled (calib_cancel / set_active) after the sheet passed: drop it.
+    if (!cfg::g_sys.calibrating.load(std::memory_order_acquire)) return;
+    if (ppm > 0.0f) {
+        cfg::RuntimeConfig* s = cfg::Config::editScratch();
+        s->pulses_per_mm = ppm;
+        cfg::Config::publish();
+        rt::onConfigApplied();
+        prog::markDirty();
+        configChanged(Source::Internal);
+        evt::postCalibResult(ppm);
+    } else {
+        evt::postError("calib_arm", "no_pulses");
+    }
+    rt::onCalibDone(ppm);     // leave calibration mode, restore active state
 }
 
 } // namespace livesync

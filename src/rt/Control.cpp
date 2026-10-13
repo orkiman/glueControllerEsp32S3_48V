@@ -32,9 +32,44 @@ void onConfigApplied() {
     seq::onConfigApplied();
 }
 
-void onCalibArm(float paperLengthMm) {
-    pattern::onCalibArm(paperLengthMm);
+static bool  s_calibResume = false;     // machine was active when armed
+static float s_calibResult = -1.0f;
+
+static void leaveCalibration(bool resume) {
+    cfg::g_sys.calibrating.store(false, std::memory_order_release);
+    if (resume && s_calibResume && !cfg::g_sys.fault.load(std::memory_order_acquire)) {
+        onSetActive(true);
+        cfg::g_sys.active.store(true, std::memory_order_release);
+    }
 }
+
+void onCalibArm(float paperLengthMm) {
+    if (!cfg::g_sys.calibrating.load(std::memory_order_acquire)) {
+        // Same stop as set_active:false -- nothing fires while measuring.
+        s_calibResume = cfg::g_sys.active.load(std::memory_order_acquire);
+        if (s_calibResume) {
+            onSetActive(false);
+            cfg::g_sys.active.store(false, std::memory_order_release);
+        }
+        cfg::g_sys.calibrating.store(true, std::memory_order_release);
+    }
+    s_calibResult = -1.0f;
+    pattern::onCalibArm(paperLengthMm);    // re-arm restarts the measurement
+}
+
+void onCalibCancel(bool resume) {
+    if (!cfg::g_sys.calibrating.load(std::memory_order_acquire)) return;
+    pattern::onCalibCancel();
+    leaveCalibration(resume);
+}
+
+void onCalibDone(float pulsesPerMm) {
+    if (!cfg::g_sys.calibrating.load(std::memory_order_acquire)) return;
+    s_calibResult = pulsesPerMm > 0.0f ? pulsesPerMm : 0.0f;
+    leaveCalibration(true);
+}
+
+float lastCalibResult() { return s_calibResult; }
 
 void onTestOpen(uint8_t gun, uint32_t timeout_ms) {
     if (cfg::g_sys.fault.load(std::memory_order_acquire)) {

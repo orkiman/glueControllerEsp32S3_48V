@@ -136,6 +136,8 @@ QFrame#HeaderSeparator { background-color: #3a414b; border: none; margin: 4px 6p
 /* ---- operator alert banner (safety trips / stops) ---- */
 QFrame#AlertBanner[level="warn"] { background-color: #92400e; border-bottom: 1px solid #b45309; }
 QFrame#AlertBanner[level="stop"] { background-color: #991b1b; border-bottom: 1px solid #b91c1c; }
+QFrame#AlertBanner[level="calib"],
+QFrame#AlertBanner[level="info"] { background-color: #1e40af; border-bottom: 1px solid #1d4ed8; }
 QFrame#AlertBanner QLabel { background: transparent; color: #ffffff; }
 QLabel#AlertIcon { font-size: 18pt; }
 QLabel#AlertText { font-size: 12pt; font-weight: 600; }

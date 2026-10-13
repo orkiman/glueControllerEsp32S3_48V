@@ -31,6 +31,8 @@ void onPhotocellFallingEdge(uint32_t pulseCountAtEdge) IRAM_ATTR;
 
 // Calibration arm (task ctx, from rt::onCalibArm).
 void onCalibArm(float paperLengthMm);
+// Disarm without a result (task ctx, from rt::onCalibCancel).
+void onCalibCancel();
 
 // Abort everything: flush sheet queues, abort all in-flight gun sequences.
 void abortAll();

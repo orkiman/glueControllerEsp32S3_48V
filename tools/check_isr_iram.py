@@ -39,7 +39,6 @@ ROOTS = [
     "encoder::photocellIsr(void*)",
     "encoder::pcntOverflowIsr(void*)",
     "fault::faultIsr(void*)",
-    "net::onNetEvent(evt::Event const&, void*)",
 ]
 
 FLASH_CODE = (0x42000000, 0x44000000)

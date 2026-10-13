@@ -15,9 +15,20 @@ void onSetActive(bool active);
 // Apply currently published config to runtime caches (DAC threshold table, etc.).
 void onConfigApplied();
 
-// Calibration: arm to count pulses between next two photocell edges of a sheet
-// of known paper_length_mm; emits {"event":"calib_result"} when done.
+// Calibration mode.  Arm: remember active/inactive, stop gluing (machine made
+// inactive), count pulses from the photocell's rising to falling edge of one
+// sheet of known paper_length_mm.  Done: apply pulses_per_mm, emit
+// calib_result (or error calib_arm/no_pulses), restore the previous state.
+// All Core 0, under livesync::Guard.
 void onCalibArm(float paper_length_mm);
+// Leave calibration mode without a result.  resume: restore the state from
+// before arming (calib_cancel); false when a set_active overrides it.
+void onCalibCancel(bool resume);
+// Measurement finished (livesync::service).  pulses_per_mm 0 = no pulses.
+void onCalibDone(float pulses_per_mm);
+// For status: > 0 last result, 0 last attempt counted no pulses, < 0 none /
+// cancelled since the last arm.
+float lastCalibResult();
 
 // Manual single-shot fire of the full dot sequence for diagnostics.
 // gun: 1..4, or 0 = all guns simultaneously.

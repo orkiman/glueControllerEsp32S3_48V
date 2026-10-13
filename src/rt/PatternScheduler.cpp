@@ -347,17 +347,16 @@ void IRAM_ATTR onPhotocellFallingEdge(uint32_t pulseAtEdge) {
 }
 
 // Task context (patternTask): turn the measured pulse count into pulses/mm.
+// 0 = nothing counted (encoder not moving / wrong source).
 static void finishCalibration() {
     uint32_t pulses = s_calibPulses.load(std::memory_order_acquire);
     float    L      = s_calibPaperLen.load(std::memory_order_acquire);
-    if (L <= 0.0f) return;
-    float ppm = (float)pulses / L;
+    float    ppm    = (L > 0.0f) ? (float)pulses / L : 0.0f;
 
-    // Applying pulses_per_mm to the config double-buffer happens in
-    // livesync::service under the shared edit lock, so this never races a
+    // Applying pulses_per_mm, reporting and leaving calibration mode happen
+    // in livesync::service under the shared edit lock, so this never races a
     // UART / web edit of the scratch buffer.
     livesync::postCalibration(ppm);
-    evt::postCalibResult(ppm);
 }
 
 // ---------------- sheet queue access (patternTask) ----------------
@@ -567,8 +566,14 @@ void onConfigApplied() {
 }
 
 void onCalibArm(float paperLengthMm) {
+    s_calibDone.store(false, std::memory_order_release);
     s_calibPaperLen.store(paperLengthMm, std::memory_order_release);
     s_calib.store(CalibState::ArmedLeading, std::memory_order_release);
+}
+
+void onCalibCancel() {
+    s_calib.store(CalibState::Idle, std::memory_order_release);
+    s_calibDone.store(false, std::memory_order_release);
 }
 
 void abortAll() {

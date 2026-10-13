@@ -250,6 +250,26 @@ connect and after `ready`, and never pushes its local defaults.
 The UART line limit and the web command body limit are 4096 bytes, so a full
 64-element pattern fits.
 
+### 7.1c Calibration mode
+
+- `{"cmd":"calib_arm","paper_length_mm":L}` enters calibration mode: the
+  controller remembers active/inactive, stops gluing exactly like
+  `set_active:false` (guns closed, queues flushed; test_open refused), and
+  reports `"calibrating":true` in `status` / `/api/status`.  Arming again
+  restarts the measurement with the new length.
+- Pulses are counted from the photocell's rising edge to its falling edge
+  (one sheet).  Then `pulses_per_mm = pulses / L` is applied and saved,
+  `calib_result` is sent, and the previous state is restored.  No pulses
+  counted -> `{"event":"error","cmd":"calib_arm","reason":"no_pulses"}`,
+  calibration unchanged, previous state restored.
+- `{"cmd":"calib_cancel"}` leaves the mode and restores the previous state.
+  `set_active` during calibration cancels it and does what it asks.
+- `/api/status` `calib_result`: > 0 last result, 0 last attempt counted no
+  pulses, < 0 none / cancelled since the last arm.  `POST /api/calibrate`
+  only arms now (it used to block up to 15 s and leave the controller armed
+  on timeout).
+- Debounce (`debounce_ms`) applies to both photocell edges.
+
 ### 7.1b Sheet counter
 
 - The firmware counts photocell leading edges accepted while active and not
@@ -299,7 +319,7 @@ Example payload:
 | Dynamic canvas | Canvas grows automatically when a segment is dragged or added outside current bounds |
 | Overlap prevention | Drag, handle resize, and double-click add all prevent segment overlap |
 | Hebrew RTL fixes | Group-box title padding widened; lane labels use document margin |
-| Encoder calibration | `calib_arm` command + `calib_result` event updates `pulses_per_mm` live |
+| Encoder calibration | Calibration mode (see §7.1c): arm / cancel button, blue banner + "קליברציה" state in the header, result / failure banner |
 | Dark RTL theme | `styles.qss` + `Qt.RightToLeft` layout direction |
 | Live pattern type push | Toolbar combo changes push `set_pattern` immediately to the firmware |
 | `set_pattern type:none` | Firmware now accepts `none` to clear/disable a gun |
@@ -346,6 +366,12 @@ cd gui
      ~200 ms and re-opens when the conveyor moves.
   6. Test buttons still work; `peak` debug events show time-to-peak.
   7. Settings: pick above 1.5 A is refused.
+- **TO CHECK — calibration mode with a real sheet (2026-10-13).**  Verified
+  on the controller without a sheet: arm from active stops gluing, cancel and
+  set_active restore / override correctly.  Still to check on the machine:
+  arm, pass one sheet of known length -> result close to expected, saved,
+  machine back to its previous state; a sheet with the conveyor stopped (or
+  wrong encoder source) -> "no pulses" message.
 
 ---
 

@@ -58,6 +58,7 @@ class RuntimeConfig:
 class LiveStatus:
     active: bool      = False
     fault: bool       = False
+    calibrating: bool = False     # calibration mode: gluing stopped
     speed_mm_s: float = 0.0
     sheet_count: int  = 0
     queue_depth: int  = 0
@@ -73,6 +74,7 @@ class AppState(QObject):
     connection_changed = Signal(bool, str)
     error_received     = Signal(str, str)  # (cmd, reason)
     programs_changed   = Signal(list)      # list of {id, name}
+    calib_result       = Signal(float)     # pulses/mm from a finished calibration
 
     def __init__(self, link: LinkBase) -> None:
         super().__init__()
@@ -82,8 +84,8 @@ class AppState(QObject):
         self.status   = LiveStatus()
         self.programs: list[dict[str, Any]] = []   # controller program index
         self.active_program_id: int = 0
-        # (active, fault) last written to glue.log; None = unknown (not connected).
-        self._logged_state: tuple[bool, bool] | None = None
+        # (active, fault, calibrating) last written to glue.log; None = unknown.
+        self._logged_state: tuple[bool, bool, bool] | None = None
 
         link.event_received.connect(self._on_event)
         link.connection_changed.connect(self._on_link_conn)
@@ -143,6 +145,9 @@ class AppState(QObject):
     def calibrate(self, paper_length_mm: float) -> None:
         self._send(proto.cmd_calib_arm(paper_length_mm))
 
+    def cancel_calibration(self) -> None:
+        self._send(proto.cmd_calib_cancel())
+
     def sw_trigger(self) -> None:
         self._send(proto.cmd_sw_trigger())
 
@@ -185,6 +190,7 @@ class AppState(QObject):
             s = self.status
             s.active      = bool(ev.get("active", s.active))
             s.fault       = bool(ev.get("fault", s.fault))
+            s.calibrating = bool(ev.get("calibrating", False))
             s.speed_mm_s  = float(ev.get("speed_mm_s", s.speed_mm_s))
             s.sheet_count = int(ev.get("sheet_count", s.sheet_count))
             s.queue_depth = int(ev.get("queue_depth", s.queue_depth))
@@ -197,6 +203,7 @@ class AppState(QObject):
             if isinstance(ppm, (int, float)):
                 self.config.pulses_per_mm = float(ppm)
                 self.config_changed.emit(self.config)
+                self.calib_result.emit(float(ppm))
         elif kind == proto.EVT_PROGRAMS_LIST:
             self.programs = ev.get("programs", [])
             self.active_program_id = ev.get("active_id", 0)
@@ -248,11 +255,13 @@ class AppState(QObject):
 
     def _log_state_change(self, s: LiveStatus) -> None:
         """Machine run state goes to glue.log only when it changes."""
-        state = (s.active, s.fault)
+        state = (s.active, s.fault, s.calibrating)
         if state == self._logged_state:
             return
         if s.fault:
             LOGGER.warning("machine: hardware fault")
+        elif s.calibrating:
+            LOGGER.info("machine: calibration mode")
         else:
             LOGGER.info("machine: %s", "active" if s.active else "stopped")
         self._logged_state = state

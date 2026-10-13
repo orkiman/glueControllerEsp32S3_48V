@@ -95,7 +95,14 @@ def cmd_test_close(gun_1based: int = 0) -> dict[str, Any]:
 
 
 def cmd_calib_arm(paper_length_mm: float) -> dict[str, Any]:
+    """Enter calibration mode: gluing stops until one sheet has passed the
+    photocell, then the controller returns to its previous state."""
     return {"cmd": "calib_arm", "paper_length_mm": float(paper_length_mm)}
+
+
+def cmd_calib_cancel() -> dict[str, Any]:
+    """Leave calibration mode without a result (previous state restored)."""
+    return {"cmd": "calib_cancel"}
 
 
 def cmd_sw_trigger() -> dict[str, Any]:

@@ -19,6 +19,9 @@ class MockLink(LinkBase):
         super().__init__()
         self._active = False
         self._fault = False
+        self._calibrating = False
+        self._calib_resume = False
+        self._calib_gen = 0
         self._sheet_count = 0
         self._speed = 0.0
         self._target_speed = 480.0  # mm/s
@@ -59,13 +62,8 @@ class MockLink(LinkBase):
             self._sheet_count = 0
             self._ack("reset_sheet_count")
         elif cmd == "set_active":
-            self._active = bool(payload.get("active", False))
-            if self._active:
-                self._fault = False
-                self._sheet_timer.start()
-            else:
-                self._sheet_timer.stop()
-                self._speed = 0.0
+            self._calibrating = False          # start/stop cancels calibration
+            self._set_mock_active(bool(payload.get("active", False)))
             self._ack("set_active")
         elif cmd == "set_config":
             for k in self._config:
@@ -126,12 +124,21 @@ class MockLink(LinkBase):
         elif cmd == "test_close":
             self._ack("test_close")
         elif cmd == "calib_arm":
+            # Like the firmware: stop gluing, remember the state, and after
+            # the "sheet" has passed apply the result and restore the state.
+            if not self._calibrating:
+                self._calib_resume = self._active
+                self._set_mock_active(False)
+                self._calibrating = True
+            self._calib_gen += 1
+            gen = self._calib_gen
             self._ack("calib_arm")
-            # Simulate a calibration result after a moment.
-            QTimer.singleShot(800, lambda: self.event_received.emit({
-                "event": "calib_result",
-                "pulses_per_mm": 12.34 + random.uniform(-0.05, 0.05),
-            }))
+            QTimer.singleShot(3000, lambda: self._finish_calibration(gen))
+        elif cmd == "calib_cancel":
+            if self._calibrating:
+                self._calibrating = False
+                self._set_mock_active(self._calib_resume)
+            self._ack("calib_cancel")
         elif cmd == "sw_trigger":
             self._ack("sw_trigger")
         else:
@@ -144,6 +151,24 @@ class MockLink(LinkBase):
         self._status_timer.start()
 
     # ---- internals ----------------------------------------------------------
+    def _set_mock_active(self, active: bool) -> None:
+        self._active = active
+        if active:
+            self._fault = False
+            self._sheet_timer.start()
+        else:
+            self._sheet_timer.stop()
+            self._speed = 0.0
+
+    def _finish_calibration(self, gen: int) -> None:
+        if not self._calibrating or gen != self._calib_gen:
+            return                               # cancelled or re-armed
+        ppm = round(12.34 + random.uniform(-0.05, 0.05), 4)
+        self._config["pulses_per_mm"] = ppm
+        self.event_received.emit({"event": "calib_result", "pulses_per_mm": ppm})
+        self._calibrating = False
+        self._set_mock_active(self._calib_resume)
+
     def _ack(self, cmd: str) -> None:
         self.event_received.emit({"event": "ack", "cmd": cmd})
 
@@ -179,6 +204,7 @@ class MockLink(LinkBase):
             "event": "status",
             "active": self._active,
             "fault": self._fault,
+            "calibrating": self._calibrating,
             "speed_mm_s": round(self._speed, 1),
             "sheet_count": self._sheet_count,
             "queue_depth": 0,

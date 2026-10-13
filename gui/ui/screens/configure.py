@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout,
 
 from app import logs
 from app import protocol as proto
-from app.state import AppState, RuntimeConfig
+from app.state import AppState, LiveStatus, RuntimeConfig
 from ui.widgets.numeric_field import NumericField
 
 
@@ -64,9 +64,11 @@ class ConfigureScreen(QWidget):
         self.f_paper = NumericField("אורך דף ידוע (לקליברציה)", "mm",
                                     10.0, 2000.0, 1.0, 1)
         self.f_ppm.bind(lambda v: state.push_config(pulses_per_mm=v))
+        # Arms calibration mode; while the controller reports `calibrating`
+        # the same button cancels it (see _on_status).
         self.btn_cal = QPushButton("דרוך קליברציה")
-        self.btn_cal.clicked.connect(
-            lambda: state.calibrate(self.f_paper.value()))
+        self.btn_cal.clicked.connect(self._on_calib_button)
+        self._calibrating = False
 
         # Encoder source: both encoders (GPIO40 fast 5V / GPIO5 alt 24V) are
         # always counted in hardware in parallel; this just selects which one
@@ -126,6 +128,7 @@ class ConfigureScreen(QWidget):
         root.addWidget(log_box, 1)
 
         state.config_changed.connect(self._on_config)
+        state.status_changed.connect(self._on_status)
         state.log_appended.connect(self._on_log)
         state.command_sent.connect(self._on_command_sent)
         self._on_config(state.config)
@@ -143,6 +146,17 @@ class ConfigureScreen(QWidget):
             self.cmb_encoder.blockSignals(True)
             self.cmb_encoder.setCurrentIndex(idx)
             self.cmb_encoder.blockSignals(False)
+
+    def _on_calib_button(self) -> None:
+        if self._calibrating:
+            self.state.cancel_calibration()
+        else:
+            self.state.calibrate(self.f_paper.value())
+
+    def _on_status(self, s: LiveStatus) -> None:
+        if s.calibrating != self._calibrating:
+            self._calibrating = s.calibrating
+            self.btn_cal.setText("בטל קליברציה" if s.calibrating else "דרוך קליברציה")
 
     def _is_routine(self, ev: dict) -> bool:
         """High-frequency, low-signal traffic that clutters the log:

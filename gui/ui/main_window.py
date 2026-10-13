@@ -69,14 +69,36 @@ class MainWindow(QMainWindow):
         # status bar shows ping/connection text
         state.connection_changed.connect(self._on_conn)
         state.error_received.connect(self._on_error)
-        # The stop message stays until the operator starts the machine again.
-        state.status_changed.connect(
-            lambda s: self.alert.clear("stop") if s.active else None)
+        state.status_changed.connect(self._on_status_alert)
+        state.calib_result.connect(
+            lambda ppm: self.alert.show_alert(
+                f"קליברציה הושלמה: {ppm:.4f} pulses/mm — נשמר. "
+                "המכונה חזרה למצב שהייתה בו לפני הקליברציה.", "info", _WARN_MS))
 
     def _on_conn(self, ok: bool, reason: str) -> None:
         self.statusBar().showMessage("מחובר" if ok else f"מנותק — {reason}")
 
+    def _on_status_alert(self, s) -> None:
+        # The stop message stays until the operator starts the machine again.
+        if s.active:
+            self.alert.clear("stop")
+        if s.calibrating:
+            if self.alert.level != "calib":
+                self.alert.show_alert(
+                    "מצב קליברציה — הדבק מושבת.\n"
+                    "העבר דף אחד מול העין. הבקר סופר פולסים מרגע שהעין עולה "
+                    "עד שהיא יורדת, ואז חוזר למצב הקודם (פעיל / לא פעיל).",
+                    "calib")
+        else:
+            self.alert.clear("calib")     # finished or cancelled
+
     def _on_error(self, cmd: str, reason: str) -> None:
+        if cmd == "calib_arm" and reason == "no_pulses":
+            self.alert.show_alert(
+                "קליברציה נכשלה — לא נספרו פולסים מהאנקודר בזמן שהדף עבר. "
+                "בדוק שהמסוע זז ושמקור האנקודר בהגדרות נכון. "
+                "הקליברציה הקודמת לא השתנתה.", "warn", _WARN_MS)
+            return
         where = f"אקדח {cmd[3:]}" if cmd.startswith("gun") else "בקר"
         if reason == "safety_stop":
             # The firmware sends the trip that caused the stop just before it.

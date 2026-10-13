@@ -25,25 +25,6 @@ static DNSServer s_dns;
 static WebServer s_server(80);
 static char s_ssid[24];
 
-static volatile uint32_t s_calibBits = 0;
-static volatile bool     s_calibReady = false;
-static TaskHandle_t      s_netTask = nullptr;
-
-static void IRAM_ATTR onNetEvent(const evt::Event& e, void*) {
-    if (e.kind != evt::Kind::CalibResult) return;
-    uint32_t bits;
-    memcpy(&bits, &e.f1, sizeof(bits));   // bit-copy float, no FPU in ISR
-    s_calibBits = bits;
-    s_calibReady = true;
-    if (!s_netTask) return;
-    if (xPortInIsrContext()) {
-        BaseType_t hp = pdFALSE;
-        vTaskNotifyGiveFromISR(s_netTask, &hp);
-    } else {
-        xTaskNotifyGive(s_netTask);
-    }
-}
-
 static void sendIndex() {
     s_server.sendHeader("Cache-Control", "no-store");
     s_server.send(200, "text/html; charset=utf-8", web::INDEX_HTML);
@@ -83,6 +64,8 @@ static void sendStatus() {
     doc["program_id"] = prog::activeId();
     doc["active"] = cfg::g_sys.active.load(std::memory_order_acquire);
     doc["fault"] = cfg::g_sys.fault.load(std::memory_order_acquire);
+    doc["calibrating"] = cfg::g_sys.calibrating.load(std::memory_order_acquire);
+    doc["calib_result"] = rt::lastCalibResult();   // >0 ppm, 0 no pulses, <0 none
     doc["pos_mm"] = pattern::currentPosMm();
     doc["speed_mm_s"] = pattern::currentSpeedMmS();
     doc["max_loop_gap_us"] = metrics.max_loop_gap_us;
@@ -285,33 +268,12 @@ static void handleCalib() {
         sendResult(400, false, "calib", "bad_paper_length");
         return;
     }
-    s_calibReady = false;
-    s_calibBits = 0;
+    // Arm only: the result is applied by livesync::service in this task's
+    // loop, and the page follows `calibrating` / `calib_result` in
+    // /api/status.  (Blocking here would also stall that loop.)
+    livesync::Guard guard;
     rt::onCalibArm(L);
-
-    bool got = false;
-    for (int i = 0; i < 150; ++i) {            // up to 15 s
-        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100)) != 0) {
-            if (s_calibReady) { got = true; break; }
-        }
-        if (s_calibReady) { got = true; break; }
-        s_dns.processNextRequest();
-        s_server.handleClient();
-    }
-    if (!got) {
-        sendResult(408, false, "calib", "timeout");
-        return;
-    }
-    float ppm;
-    uint32_t bits = s_calibBits;
-    memcpy(&ppm, &bits, sizeof(bits));
-
-    JsonDocument resp;
-    resp["ok"] = true;
-    resp["pulses_per_mm"] = ppm;
-    String out;
-    serializeJson(resp, out);
-    s_server.send(200, "application/json", out);
+    sendResult(200, true, "calib");
 }
 
 static void networkTask(void*) {
@@ -361,9 +323,6 @@ static void networkTask(void*) {
     s_server.on("/api/calibrate", HTTP_POST, handleCalib);
     s_server.onNotFound(sendIndex);
     s_server.begin();
-
-    s_netTask = xTaskGetCurrentTaskHandle();
-    evt::setCallback(onNetEvent, nullptr);
 
     for (;;) {
         s_dns.processNextRequest();

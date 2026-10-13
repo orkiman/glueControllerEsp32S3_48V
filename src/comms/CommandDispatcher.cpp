@@ -63,6 +63,8 @@ static Result handleSetActive(JsonDocument& doc) {
         return makeResult(false, "set_active", "missing_active");
     }
     bool a = doc["active"].as<bool>();
+    // Start / stop during calibration: the operator's command wins.
+    rt::onCalibCancel(false);
     if (a && cfg::g_sys.fault.load()) {
         cfg::g_sys.fault.store(false);
     }
@@ -162,6 +164,11 @@ static Result handleCalibArm(JsonDocument& doc) {
     if (L <= 0.0f) { return makeResult(false, "calib_arm","bad_paper_length"); }
     rt::onCalibArm(L);
     return makeResult(true, "calib_arm");
+}
+
+static Result handleCalibCancel(JsonDocument&) {
+    rt::onCalibCancel(true);      // back to the state from before arming
+    return makeResult(true, "calib_cancel");
 }
 
 static Result handleListPrograms(JsonDocument&) {
@@ -271,6 +278,7 @@ static Result dispatchLocked(JsonDocument& doc) {
     else if (!strcmp(command, "set_config"))      return handleSetConfig(doc);
     else if (!strcmp(command, "set_pattern"))     return handleSetPattern(doc);
     else if (!strcmp(command, "calib_arm"))       return handleCalibArm(doc);
+    else if (!strcmp(command, "calib_cancel"))    return handleCalibCancel(doc);
     else if (!strcmp(command, "test_open"))       return handleTestOpen(doc);
     else if (!strcmp(command, "test_close"))     return handleTestClose(doc);
     else if (!strcmp(command, "ping"))            return handlePing(doc);

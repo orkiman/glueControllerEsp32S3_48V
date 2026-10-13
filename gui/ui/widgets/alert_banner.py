@@ -6,7 +6,8 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton
 
 
 class AlertBanner(QFrame):
-    """Hidden until `show_alert`.  level "warn" (amber) or "stop" (red).
+    """Hidden until `show_alert`.  level "warn" (amber), "stop" (red),
+    "calib" (blue, calibration mode) or "info" (blue, e.g. a result).
     A timeout of 0 keeps the banner until the operator closes it or
     `clear("stop")` is called."""
 
@@ -50,7 +51,7 @@ class AlertBanner(QFrame):
         self.setProperty("level", level)
         self.style().unpolish(self)
         self.style().polish(self)
-        self.icon.setText("⛔" if level == "stop" else "⚠")
+        self.icon.setText({"stop": "⛔", "calib": "◎", "info": "✓"}.get(level, "⚠"))
         self.text.setText(text)
         self._timer.stop()
         if timeout_ms:

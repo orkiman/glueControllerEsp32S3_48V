@@ -36,6 +36,7 @@ struct Event {
     float   f1;           // CalibResult: pulses_per_mm ; Status: pos_mm
     float   f2;           // Status: speed_mm_s
     uint8_t b1;           // Status: active flag
+    uint8_t b2;           // Status: calibrating flag
     uint32_t u1;
     uint32_t u2;
     uint32_t u3;
@@ -64,6 +65,6 @@ void postWatchdogTimeout();
 void postStatus(float pos_mm, float speed_mm_s, bool active,
                 uint32_t maxLoopGapUs, uint32_t maxEventLatePulses,
                 uint32_t patternEvents, uint32_t sheetQueueOverflows,
-                uint32_t sheetCount, uint32_t rtTicks);
+                uint32_t sheetCount, uint32_t rtTicks, bool calibrating);
 
 } // namespace evt

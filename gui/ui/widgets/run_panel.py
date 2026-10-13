@@ -87,6 +87,9 @@ class RunPanel(QWidget):
         if s.fault:
             self.lbl_state.setText("⚠  תקלה")
             self.lbl_state.setStyleSheet("color:#ef4444;")
+        elif s.calibrating:
+            self.lbl_state.setText("◎  קליברציה")
+            self.lbl_state.setStyleSheet("color:#60a5fa;")
         elif s.active:
             self.lbl_state.setText("●  פעיל")
             self.lbl_state.setStyleSheet("color:#22c55e;")

@@ -44,7 +44,8 @@ void programLoaded();              // whole config replaced from storage
 void emitFullState();
 void emitProgramsList();
 
-// ISR-safe: hand a calibration result to task context for applying.
+// ISR-safe: hand a calibration result to task context for applying
+// (0 = no pulses counted; still ends calibration mode).
 void IRAM_ATTR postCalibration(float pulses_per_mm);
 
 // Task context, call often: applies a pending calibration result.

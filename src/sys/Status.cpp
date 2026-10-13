@@ -21,7 +21,8 @@ static void statusTask(void*) {
                         metrics.pattern_events,
                         metrics.sheet_queue_overflows,
                         pattern::sheetCount(),
-                        seq::supervisorTicks());
+                        seq::supervisorTicks(),
+                        cfg::g_sys.calibrating.load(std::memory_order_acquire));
         vTaskDelay(pdMS_TO_TICKS(200));   // 5 Hz
     }
 }

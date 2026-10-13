@@ -85,6 +85,7 @@ private:
 struct SystemState {
     std::atomic<bool>     active{false};        // mirrors HMI set_active command
     std::atomic<bool>     fault{false};         // nFAULT latched
+    std::atomic<bool>     calibrating{false};   // calibration mode (gluing stopped)
     std::atomic<uint32_t> lastCmdMs{0};         // watchdog refresh timestamp
 };
 
