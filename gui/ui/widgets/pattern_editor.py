@@ -87,9 +87,13 @@ class HandleItem(QGraphicsItem):
         return QRectF(-r, -r, 2 * r, 2 * r)
 
     def paint(self, p: QPainter, *_a) -> None:
+        # Hollow ring: a dot (or line) under the handle stays visible.  The
+        # whole circle is still grabbable (shape = bounding rect).
         p.setRenderHint(QPainter.Antialiasing)
-        p.setPen(QPen(QColor("#0f1318"), 1.5))
-        p.setBrush(QBrush(QColor("#e6e9ee")))
+        p.setBrush(Qt.NoBrush)
+        p.setPen(QPen(QColor("#0f1318"), 3.5))          # dark edge for contrast
+        p.drawEllipse(QPointF(0, 0), HANDLE_R, HANDLE_R)
+        p.setPen(QPen(QColor("#e6e9ee"), 2.0))
         p.drawEllipse(QPointF(0, 0), HANDLE_R, HANDLE_R)
 
     def mousePressEvent(self, ev):  # noqa: N802
