@@ -51,7 +51,17 @@ class ProgramBar(QWidget):
         lay.addStretch(1)
         lay.addWidget(btn_del)
 
+        # Choosing a program is always allowed; save / new / delete need
+        # admin mode.
+        self._edit_buttons = (btn_save, btn_save_as, btn_new, btn_del)
+        state.admin.changed.connect(self._apply_lock)
+        self._apply_lock(state.admin.active)
+
         state.programs_changed.connect(self._on_programs_changed)
+
+    def _apply_lock(self, admin: bool) -> None:
+        for b in self._edit_buttons:
+            b.setEnabled(admin)
 
     # ---- combo helpers -------------------------------------------------------
     def _id_for_name(self, name: str) -> int:

@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (QComboBox, QGridLayout, QGroupBox, QHBoxLayout,
 
 from app import protocol as proto
 from app.state import AppState, GunPattern
+from ui.widgets.admin_button import AdminButton
 from ui.widgets.numeric_field import NumericField
 from ui.widgets.pattern_editor import GUN_COLORS, PatternEditorView
 
@@ -64,6 +65,7 @@ class GunToolbar(QGroupBox):
         btn_test.setCheckable(True)
         btn_test.toggled.connect(self._on_test_toggled)
         self.btn_test = btn_test
+        self.btn_add, self.btn_clr = btn_add, btn_clr
 
         # The firmware does not emit a dedicated "test finished" event, so we
         # use the button checked state as the running indicator and release it
@@ -74,6 +76,7 @@ class GunToolbar(QGroupBox):
         state.error_received.connect(self._on_test_error)
         state.connection_changed.connect(self._update_test_enabled)
         state.status_changed.connect(self._update_test_enabled)
+        state.admin.changed.connect(lambda _on: self._apply_lock())
 
         type_row = QHBoxLayout()
         type_row.addWidget(QLabel("סוג:"))
@@ -90,6 +93,7 @@ class GunToolbar(QGroupBox):
         outer.addLayout(type_row)
         outer.addLayout(btn_row)
         outer.addWidget(self.f_droplet)
+        self._apply_lock()
 
     def set_type_from_state(self, ptype: proto.PatternType) -> None:
         idx = self.type_combo.findData(ptype)
@@ -97,18 +101,29 @@ class GunToolbar(QGroupBox):
             self.type_combo.blockSignals(True)
             self.type_combo.setCurrentIndex(idx)
             self.type_combo.blockSignals(False)
+        self._apply_lock()
+
+    def _apply_lock(self) -> None:
+        """Editing the program (type, segments, drop size) and tests need
+        admin mode; selecting a program and start/stop do not."""
+        admin = self.state.admin.active
+        for w in (self.type_combo, self.btn_add, self.btn_clr):
+            w.setEnabled(admin)
         # Droplet field is meaningful only for Dots — disable otherwise.
-        self.f_droplet.setEnabled(ptype == proto.PatternType.DOTS)
+        self.f_droplet.setEnabled(
+            admin and self.state.patterns[self.gun_idx].type == proto.PatternType.DOTS)
         self._update_test_enabled()
 
     def _update_test_enabled(self, _ok: bool = False, _reason: str = "") -> None:
         # Gun tests run only while the machine is stopped (firmware rule).
         status = self.state.status
-        enabled = (self.state.link.connected and
-                   not status.active and not status.calibrating and
-                   self.state.patterns[self.gun_idx].type != proto.PatternType.NONE)
-        self.btn_test.setEnabled(enabled)
-        if not enabled:
+        can_test = (self.state.link.connected and
+                    not status.active and not status.calibrating and
+                    self.state.patterns[self.gun_idx].type != proto.PatternType.NONE)
+        # Starting needs admin mode; a running test can always be stopped.
+        self.btn_test.setEnabled(
+            can_test and (self.state.admin.active or self.btn_test.isChecked()))
+        if not can_test:
             # Starting the machine (or calibration) ends a running test.
             self._release_test_button()
 
@@ -118,10 +133,10 @@ class GunToolbar(QGroupBox):
     def _on_type_changed(self, _i: int) -> None:
         ptype: proto.PatternType = self.type_combo.currentData()
         self.editor.set_gun_type(self.gun_idx, ptype)
-        self.f_droplet.setEnabled(ptype == proto.PatternType.DOTS)
 
         gp = self.state.patterns[self.gun_idx]
         gp.type = ptype
+        self._apply_lock()                 # droplet field follows the type
         gp.elements = [] if ptype == proto.PatternType.NONE else [
             e for e in self.editor.export_pattern(self.gun_idx)[1]
         ]
@@ -175,9 +190,15 @@ class PatternsScreen(QWidget):
         self.f_test_s.setToolTip(
             "כמה זמן לחיצה על 'בדיקה' מפעילה את האקדח. "
             "בקווים האקדח פתוח ברצף כל הזמן הזה; בנקודות — 20 טיפות בשנייה.")
+        # Editing the program needs admin mode (selecting one does not).
+        self.lbl_lock = QLabel()
+        self.lbl_lock.setObjectName("StatCaption")
         test_row = QHBoxLayout()
         test_row.addWidget(self.f_test_s)
+        test_row.addSpacing(16)
+        test_row.addWidget(self.lbl_lock)
         test_row.addStretch(1)
+        test_row.addWidget(AdminButton(state.admin))
 
         grid = QGridLayout()
         grid.setHorizontalSpacing(8)
@@ -201,6 +222,9 @@ class PatternsScreen(QWidget):
         root.addWidget(self.editor, 1)
         root.addWidget(hint)
 
+        state.admin.changed.connect(lambda _on: self._apply_lock())
+        self._apply_lock()
+
         # Live publish wiring (editor -> firmware via state).
         self.editor.pattern_committed.connect(self._on_pattern_committed)
         state.config_changed.connect(self._on_config)
@@ -212,6 +236,15 @@ class PatternsScreen(QWidget):
                 state.patterns[i].on_timeout_ms)
             self.editor.load_pattern(i, state.patterns[i].type,
                                      state.patterns[i].elements)
+
+    def _apply_lock(self) -> None:
+        admin = self.state.admin.active
+        self.f_test_s.setEnabled(admin)
+        self.editor.set_editable(admin)
+        self.lbl_lock.setText(
+            "🔓  מצב מנהל — אפשר לערוך את התוכנית."
+            if admin else
+            "🔒  עריכת התוכנית נעולה (בחירת תוכנית והפעלה/עצירה פתוחות).")
 
     def _on_pattern_changed(self, gun_idx: int, gp: GunPattern) -> None:
         self.editor.load_pattern(gun_idx, gp.type, gp.elements)

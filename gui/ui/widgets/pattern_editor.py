@@ -577,7 +577,14 @@ class PatternEditorView(QGraphicsView):
         bar.setValue(bar.value() - ev.angleDelta().y())
         ev.accept()
 
+    def set_editable(self, on: bool) -> None:
+        """Locked (outside admin mode): view only.  Non-interactive also stops
+        drags, wheel spacing and the right-click delete menu on segments."""
+        self.setInteractive(on)
+
     def mouseDoubleClickEvent(self, ev):  # noqa: N802
+        if not self.isInteractive():
+            return
         # Add a new element on the lane that was double-clicked.
         scene_pt = self.mapToScene(ev.position().toPoint())
         for i in range(proto.NUM_GUNS):
