@@ -22,6 +22,13 @@ from .link_base import LinkBase
 
 LOGGER = logging.getLogger("state")
 
+# Log levels (see app/logs.py): INFO/WARNING go to glue.log, DEBUG only to
+# debug.log in debug mode.
+_ROUTINE_CMDS = {"get_state", "list_programs"}          # state sync, not operator actions
+_ROUTINE_EVENTS = {"status", "ack", "config", "pattern",  # 5 Hz stream / sync replies
+                   "programs_list", "debug", "pattern_event"}
+_PROBLEM_EVENTS = {"error", "ready", "watchdog_timeout"}  # ready = controller restarted
+
 
 @dataclass
 class GunPattern:
@@ -75,6 +82,8 @@ class AppState(QObject):
         self.status   = LiveStatus()
         self.programs: list[dict[str, Any]] = []   # controller program index
         self.active_program_id: int = 0
+        # (active, fault) last written to glue.log; None = unknown (not connected).
+        self._logged_state: tuple[bool, bool] | None = None
 
         link.event_received.connect(self._on_event)
         link.connection_changed.connect(self._on_link_conn)
@@ -89,8 +98,18 @@ class AppState(QObject):
     def _send(self, payload: dict[str, Any]) -> None:
         """Single funnel for outbound traffic so we can surface every command
         in the event log (the 1 Hz ping keep-alive is deliberately silent)."""
-        if payload.get("cmd") != "ping":
-            LOGGER.info("send: %s", payload)
+        cmd = payload.get("cmd")
+        if cmd != "ping":
+            if cmd in _ROUTINE_CMDS:
+                LOGGER.debug("send: %s", payload)
+            elif cmd == "set_pattern":
+                # Full element list only in debug.log; editing sends many.
+                LOGGER.info("send: set_pattern gun %s %s, %d elements",
+                            payload.get("gun"), payload.get("type"),
+                            len(payload.get("elements", [])))
+                LOGGER.debug("send: %s", payload)
+            else:
+                LOGGER.info("send: %s", payload)
             self.command_sent.emit(payload)
         self.link.send(payload)
 
@@ -151,9 +170,14 @@ class AppState(QObject):
 
     # ---- inbound (firmware -> UI) ------------------------------------------
     def _on_event(self, ev: dict[str, Any]) -> None:
-        LOGGER.info("event: %s", ev)
-        self.log_appended.emit(ev)
         kind = ev.get("event", "")
+        if kind in _ROUTINE_EVENTS:
+            LOGGER.debug("event: %s", ev)
+        elif kind in _PROBLEM_EVENTS:
+            LOGGER.warning("event: %s", ev)
+        else:   # calib_result, raw (boot banner / crash dump), unknown
+            LOGGER.info("event: %s", ev)
+        self.log_appended.emit(ev)
         if kind == proto.EVT_READY:
             # Firmware (re)booted and restored its active program from flash.
             self.request_state()
@@ -164,6 +188,7 @@ class AppState(QObject):
             s.speed_mm_s  = float(ev.get("speed_mm_s", s.speed_mm_s))
             s.sheet_count = int(ev.get("sheet_count", s.sheet_count))
             s.queue_depth = int(ev.get("queue_depth", s.queue_depth))
+            self._log_state_change(s)
             self.status_changed.emit(s)
         elif kind == proto.EVT_ERROR:
             self.error_received.emit(ev.get("cmd", ""), ev.get("reason", ""))
@@ -221,7 +246,23 @@ class AppState(QObject):
         the web UI changed on it) wins."""
         self._send(proto.cmd_get_state())
 
+    def _log_state_change(self, s: LiveStatus) -> None:
+        """Machine run state goes to glue.log only when it changes."""
+        state = (s.active, s.fault)
+        if state == self._logged_state:
+            return
+        if s.fault:
+            LOGGER.warning("machine: hardware fault")
+        else:
+            LOGGER.info("machine: %s", "active" if s.active else "stopped")
+        self._logged_state = state
+
     def _on_link_conn(self, ok: bool, reason: str) -> None:
+        if ok:
+            LOGGER.info("connected: %s", reason)
+        else:
+            LOGGER.warning("disconnected: %s", reason)
+            self._logged_state = None
         self.connection_changed.emit(ok, reason)
         if ok:
             self.request_state()

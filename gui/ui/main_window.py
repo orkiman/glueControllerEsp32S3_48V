@@ -6,6 +6,7 @@ from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (QFileDialog, QMainWindow, QMessageBox,
                                QSizePolicy, QTabWidget, QVBoxLayout, QWidget)
 
+from app import logs
 from app import profiles
 from app import protocol as proto
 from app.state import AppState
@@ -122,10 +123,24 @@ class MainWindow(QMainWindow):
         m_file.addAction(act_save)
 
         m_file.addSeparator()
+        # Off at every start (see app/logs.py); not saved between runs.
+        self.act_debug = QAction("מצב דיבאג (לוג מלא)", self)
+        self.act_debug.setCheckable(True)
+        self.act_debug.setChecked(logs.debug_enabled())
+        self.act_debug.toggled.connect(self._toggle_debug)
+        m_file.addAction(self.act_debug)
+
+        m_file.addSeparator()
         act_quit = QAction("יציאה", self)
         act_quit.setShortcut(QKeySequence.Quit)
         act_quit.triggered.connect(self.close)
         m_file.addAction(act_quit)
+
+    def _toggle_debug(self, on: bool) -> None:
+        logs.set_debug(on)
+        self.statusBar().showMessage(
+            f"מצב דיבאג פעיל — כל התעבורה נרשמת ל-{logs.debug_path()}" if on
+            else "מצב דיבאג כבוי", 6000)
 
     def _save_profile(self) -> None:
         path, _ = QFileDialog.getSaveFileName(

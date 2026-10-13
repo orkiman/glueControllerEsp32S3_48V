@@ -39,7 +39,13 @@ target.  The theme (`ui/styles.qss`) is bundled.
 On the machine computer (Windows 10/11, 64-bit):
 
 - Copy `GlueController.exe` into its own folder (e.g. `C:\GlueController\`);
-  `debug.log` is written next to it (capped at 3 x 5 MB).
+  the logs are written next to it:
+  - `glue.log` — always on, important events only (connect/disconnect,
+    start/stop, setting / pattern / program changes, controller errors and
+    safety trips, controller restarts and crash dumps).  Max 3 x 1 MB.
+  - `debug.log` — only in debug mode (menu *קובץ → מצב דיבאג*, or
+    `--debug`): all traffic including the 5 Hz status stream.  Debug mode is
+    off at every start and the file is cleared when the program opens.
 - First run: Windows SmartScreen may warn (the exe is unsigned) —
   *More info → Run anyway*.
 - The CP210x USB-UART driver must be present (Windows Update usually installs

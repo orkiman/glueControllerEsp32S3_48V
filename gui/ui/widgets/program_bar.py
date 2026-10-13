@@ -61,7 +61,7 @@ class ProgramBar(QWidget):
         return 0
 
     def _on_programs_changed(self, programs: list) -> None:
-        LOGGER.info("programs_changed: %s", programs)
+        LOGGER.debug("programs_changed: %s", programs)
         self._loading = True
         current_id = self._current_id()
         self.combo.blockSignals(True)
@@ -87,7 +87,7 @@ class ProgramBar(QWidget):
         if self._loading:
             return
         pid = self._current_id()
-        LOGGER.info("combo changed -> load_program id=%s", pid)
+        LOGGER.debug("combo changed -> load_program id=%s", pid)
         if pid:
             self.state.load_program(pid)
 
