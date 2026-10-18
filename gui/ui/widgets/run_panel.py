@@ -6,6 +6,40 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
 
 from app.state import AppState, LiveStatus
 
+# Machine state colours: lots of green while running, lots of red while stopped.
+STATE_COLORS = {
+    "active": "#16a34a",
+    "stopped": "#dc2626",
+    "fault": "#dc2626",
+    "calib": "#2563eb",
+    "none": "#2d333b",       # disconnected / unknown
+}
+
+
+def state_key(s: LiveStatus) -> str:
+    if s.fault:
+        return "fault"
+    if s.calibrating:
+        return "calib"
+    return "active" if s.active else "stopped"
+
+
+class StateStrip(QFrame):
+    """Full-width coloured strip under the header: green running, red stopped."""
+
+    def __init__(self, state: AppState) -> None:
+        super().__init__()
+        self.state = state
+        self.setFixedHeight(10)
+        self._paint("none")
+        state.status_changed.connect(
+            lambda s: self._paint(state_key(s) if state.link.connected else "none"))
+        state.connection_changed.connect(
+            lambda ok, _r: self._paint(state_key(state.status) if ok else "none"))
+
+    def _paint(self, key: str) -> None:
+        self.setStyleSheet(f"background-color:{STATE_COLORS[key]}; border:none;")
+
 
 class RunPanel(QWidget):
     def __init__(self, state: AppState) -> None:
@@ -17,7 +51,8 @@ class RunPanel(QWidget):
         self.btn_action.setMinimumWidth(120)
         self.btn_action.clicked.connect(self._toggle_active)
 
-        self.lbl_state  = self._value("—", "○  לא פעיל")
+        self.lbl_state  = self._value("—", "■  לא פעיל")
+        self.lbl_state.setMinimumWidth(self.lbl_state.minimumWidth() + 40)
         self.lbl_speed  = self._value("0 mm/s", "0000 mm/s")
         self.lbl_sheets = self._value("0", "000000")
         # Photocell (INPUT1): lit while it sees a sheet; tooltip = 24V / 0V.
@@ -79,28 +114,18 @@ class RunPanel(QWidget):
         self.state.set_active(not self.state.status.active)
 
     def _set_button(self, active: bool) -> None:
+        # Stays blue in both states; the state pill and strip carry the colour.
         self.btn_action.setText("■  עצור" if active else "▶  הפעל")
-        name = "DangerButton" if active else "PrimaryButton"
-        if self.btn_action.objectName() != name:
-            self.btn_action.setObjectName(name)
-            self.btn_action.style().unpolish(self.btn_action)
-            self.btn_action.style().polish(self.btn_action)
 
     def _on_status(self, s: LiveStatus) -> None:
         if not self.state.link.connected:
             return
-        if s.fault:
-            self.lbl_state.setText("⚠  תקלה")
-            self.lbl_state.setStyleSheet("color:#ef4444;")
-        elif s.calibrating:
-            self.lbl_state.setText("◎  קליברציה")
-            self.lbl_state.setStyleSheet("color:#60a5fa;")
-        elif s.active:
-            self.lbl_state.setText("●  פעיל")
-            self.lbl_state.setStyleSheet("color:#22c55e;")
-        else:
-            self.lbl_state.setText("○  לא פעיל")
-            self.lbl_state.setStyleSheet("color:#ef4444;")
+        key = state_key(s)
+        self.lbl_state.setText({"fault": "⚠  תקלה", "calib": "◎  קליברציה",
+                                "active": "●  פעיל", "stopped": "■  לא פעיל"}[key])
+        self.lbl_state.setStyleSheet(
+            f"background-color:{STATE_COLORS[key]}; color:#ffffff;"
+            " border-radius:6px; padding:2px 14px;")
         self._set_button(s.active)
         self.lbl_speed.setText(f"{s.speed_mm_s:.0f} mm/s")
         self.lbl_sheets.setText(str(s.sheet_count))

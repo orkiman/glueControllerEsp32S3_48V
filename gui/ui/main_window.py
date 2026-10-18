@@ -12,7 +12,7 @@ from ui.screens.patterns import PatternsScreen
 from ui.widgets.alert_banner import AlertBanner
 from ui.widgets.connection_bar import ConnectionBar
 from ui.widgets.program_bar import ProgramBar
-from ui.widgets.run_panel import RunPanel
+from ui.widgets.run_panel import RunPanel, StateStrip
 
 # Firmware safety trips: {"event":"error","cmd":"gunN"|"rt","reason":...}.
 # Operator wording: what happened, then what to do.  Keep in sync with the
@@ -61,6 +61,7 @@ class MainWindow(QMainWindow):
         self._last_trip: dict[str, str] = {}   # "gunN" -> last trip reason
 
         v.addWidget(ConnectionBar(state, RunPanel(state)))
+        v.addWidget(StateStrip(state))
         v.addWidget(self.program_bar)
         v.addWidget(self.alert)
         v.addWidget(body, 1)
