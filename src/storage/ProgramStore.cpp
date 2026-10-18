@@ -223,6 +223,8 @@ static bool validateAndParse(JsonDocument& doc, cfg::RuntimeConfig& out, char* n
 
     if (!cfgObj["hold_current_a"].is<float>())        return false;
     float holdA = cfgObj["hold_current_a"];
+    // Programs saved before the limit existed load with hold capped.
+    if (holdA > cfg::MAX_HOLD_CURRENT_A) holdA = cfg::MAX_HOLD_CURRENT_A;
     if (holdA <= 0.0f || holdA >= pickA) return false;
 
     if (!cfgObj["encoder_source"].is<uint8_t>())     return false;

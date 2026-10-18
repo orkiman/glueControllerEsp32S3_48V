@@ -15,6 +15,8 @@ NUM_GUNS = 4
 MAX_ELEMENTS_PER_GUN = 64
 # Firmware limit (cfg::MAX_PICK_CURRENT_A): the current sense cannot see more.
 MAX_PICK_CURRENT_A = 1.5
+# Firmware limit (cfg::MAX_HOLD_CURRENT_A).
+MAX_HOLD_CURRENT_A = 0.5
 # Firmware limit for test_open (operator-set test duration).
 MAX_TEST_MS = 30000
 

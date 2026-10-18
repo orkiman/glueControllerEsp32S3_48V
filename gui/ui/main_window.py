@@ -113,6 +113,10 @@ class MainWindow(QMainWindow):
             self._last_trip[cmd] = reason
             self.alert.show_alert(f"{where}: {trip}", "warn", _WARN_MS)
             return
+        if reason == "hold_too_high":
+            self.statusBar().showMessage(
+                f"שגיאה: זרם החזקה מעל {proto.MAX_HOLD_CURRENT_A}A — לא נשמר", 6000)
+            return
         if reason == "pick_too_high":
             self.statusBar().showMessage(
                 f"שגיאה: זרם משיכה מעל {proto.MAX_PICK_CURRENT_A}A — לא נשמר", 6000)

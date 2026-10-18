@@ -22,6 +22,8 @@ constexpr size_t MAX_PATTERN_ELEMENTS_PER_GUN = 64;
 // 40 mOhm) on a 3.3 V supply, so above ~1.6 A the comparator can never trip;
 // 1.5 A keeps a margin.
 constexpr float MAX_PICK_CURRENT_A = 1.5f;
+// Highest hold current (operator limit; hold runs for the whole line).
+constexpr float MAX_HOLD_CURRENT_A = 0.5f;
 
 struct PatternElement {
     float    start_mm;

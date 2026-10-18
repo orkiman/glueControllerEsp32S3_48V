@@ -33,7 +33,8 @@ class ConfigureScreen(QWidget):
         # ---- Operation params (currents — global, all guns) ----------------
         max_pick = proto.MAX_PICK_CURRENT_A
         self.f_pick = NumericField("זרם משיכה (Pick)", "A", 0.1, max_pick, 0.05, 2)
-        self.f_hold = NumericField("זרם החזקה (Hold)", "A", 0.05, max_pick - 0.05, 0.05, 2)
+        self.f_hold = NumericField("זרם החזקה (Hold)", "A", 0.05,
+                                   proto.MAX_HOLD_CURRENT_A, 0.05, 2)
         self.f_pick.bind(lambda v: state.push_config(pick_current_a=v))
         self.f_hold.bind(lambda v: state.push_config(hold_current_a=v))
 

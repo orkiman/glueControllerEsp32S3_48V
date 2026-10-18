@@ -137,6 +137,9 @@ ITRIP ~3 A) still caps the current.
   comparator side (gun 4's select, GPIO48, has a weak pull-up at reset).
 - Pick current max 1.5 A (`cfg::MAX_PICK_CURRENT_A`): the sense gives 2 V/A
   on a 3.3 V supply, so above ~1.6 A the comparator can never trip.
+- Hold current max 0.5 A (`cfg::MAX_HOLD_CURRENT_A`, operator limit since
+  2026-10-18): set_config above it fails `hold_too_high`; programs saved with
+  more load capped to 0.5 A.  GUI / web fields stop at 0.5.
 
 ---
 
@@ -226,6 +229,7 @@ supervisor applies as in production (a safety stop ends test mode).
 | `test_open`    | `no_pattern_or_busy`    | Gun has no pattern, or a test is already running on it. |
 | `set_pattern`  | `bad_on_timeout`        | `on_timeout_ms` was supplied but ≤ 0.                   |
 | `set_config`   | `pick_too_high`         | `pick_current_a` above 1.5 A.                           |
+| `set_config`   | `hold_too_high`         | `hold_current_a` above 0.5 A.                           |
 | `gun1`..`gun4`, `rt` | `pick_timeout`, `decay_timeout`, `close_late`, `in1_stray`, `tick_stalled`, `safety_stop` | Safety trips, see §3a. |
 | `dac`          | `i2c_write_failed`, `eeprom_*_failed`, `init_failed` | DAC problems.                          |
 
