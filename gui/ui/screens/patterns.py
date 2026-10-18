@@ -104,8 +104,8 @@ class GunToolbar(QGroupBox):
         self._apply_lock()
 
     def _apply_lock(self) -> None:
-        """Editing the program (type, segments, drop size) and tests need
-        admin mode; selecting a program and start/stop do not."""
+        """Editing the program (type, segments, drop size) needs admin mode;
+        selecting a program, start/stop and gun tests do not."""
         admin = self.state.admin.active
         for w in (self.type_combo, self.btn_add, self.btn_clr):
             w.setEnabled(admin)
@@ -120,9 +120,8 @@ class GunToolbar(QGroupBox):
         can_test = (self.state.link.connected and
                     not status.active and not status.calibrating and
                     self.state.patterns[self.gun_idx].type != proto.PatternType.NONE)
-        # Starting needs admin mode; a running test can always be stopped.
-        self.btn_test.setEnabled(
-            can_test and (self.state.admin.active or self.btn_test.isChecked()))
+        # Open to everyone (no admin needed); the test duration is admin-only.
+        self.btn_test.setEnabled(can_test)
         if not can_test:
             # Starting the machine (or calibration) ends a running test.
             self._release_test_button()
@@ -244,7 +243,7 @@ class PatternsScreen(QWidget):
         self.lbl_lock.setText(
             "🔓  מצב מנהל — אפשר לערוך את התוכנית."
             if admin else
-            "🔒  עריכת התוכנית נעולה (בחירת תוכנית והפעלה/עצירה פתוחות).")
+            "🔒  עריכת התוכנית נעולה (בחירת תוכנית, הפעלה/עצירה ובדיקת אקדחים פתוחות).")
 
     def _on_pattern_changed(self, gun_idx: int, gp: GunPattern) -> None:
         self.editor.load_pattern(gun_idx, gp.type, gp.elements)
