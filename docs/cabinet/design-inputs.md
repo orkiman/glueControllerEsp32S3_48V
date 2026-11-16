@@ -146,8 +146,13 @@ away; always open in test mode.
   section 4 was read from the C-420 manual.  Pinout must be verified on the
   real cables (gun coil about 12 ohm between pins 1 and 2) before wiring.
 
+- Owner: connector type and pin arrangement are identical on all hhs
+  controllers, so the C-420 pinout applies.  The pin arrangement drawing is
+  on pages 37-38 of the controller manual (local PDF only).
+- Mounting: on a table.  Cables leave from the rear; from a side is also
+  acceptable if the touch screen takes the large face.
+
 ## 8. Open questions
 
-1. Which controller is on the machine: C-420 or C-1100?
-2. Straight-on close-up of a gun plug and of the encoder plug (pin layout).
-3. Where will the box be mounted?
+1. Pin arrangement of the 3- and 5-pole M16 inserts: screenshot of manual
+   pages 37-38 or a straight-on photo of a plug (needed before ordering).
