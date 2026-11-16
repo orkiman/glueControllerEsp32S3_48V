@@ -64,7 +64,7 @@ o.append('<style>.t{font-size:13px;fill:#222}.s{font-size:12px;fill:#333}'
          '.b{font-size:13px;font-weight:bold;fill:#111}.h{font-size:20px;font-weight:bold;fill:#111}'
          '.n{font-size:12px;fill:#555;font-style:italic}</style>')
 o.append(f'<rect width="{W}" height="{H}" fill="#fff"/>')
-text(30, 34, "Glue controller cabinet - wiring diagram (DRAFT 1)", "h")
+text(30, 34, "Glue controller cabinet - wiring diagram (DRAFT 2)", "h")
 text(30, 54, "Fuse values and supply models are provisional. Dashed = optional / not decided.", "n")
 
 # ---------------------------------------------------------------- mains
@@ -93,12 +93,7 @@ diode(480, 235, 285, "D-A"); dot(480, 235, C24); dot(480, 285, C0)
 # +48 V : PSU-B V+ -> F1 -> X1 (E-stop link) -> CN1-1
 line([(420, 85), (520, 85)], C48)
 fuse(520, 85, "F1", "4 A T", C48)
-line([(566, 85), (585, 85)], C48)
-o.append('<rect x="585" y="70" width="60" height="30" rx="4" fill="#fff" stroke="#222" '
-         'stroke-width="1.5" stroke-dasharray="6 4"/>')
-text(640, 62, "X1 E-stop / interlock", "b", "middle")
-text(615, 90, "link", "s", "middle")
-line([(645, 85), (665, 85), (665, 370), (700, 370)], C48)
+line([(566, 85), (665, 85), (665, 370), (700, 370)], C48)
 text(672, 200, "+48 V", "b", col=C48)
 
 # +24 V : PSU-A V+ -> F2 -> CN6-1 ;  -> F3 -> sensor rail
@@ -154,13 +149,13 @@ text(838, 790, "USB cable to the DevKit", "n")
 for i in range(4):
     y = 470 + 80 * i
     box(60, y - 28, 170, 72, f"GUN {i + 1}", fill="#f5f3ff")
-    text(145, y + 6, "5-pole socket", "s", "middle")
+    text(145, y + 6, "M16 5-pole socket", "s", "middle")
     pin(230, y, "1", "r"); pin(230, y + 30, "2", "r")
     line([(230, y), (700, y)], CGUN)
     line([(230, y + 30), (700, y + 30)], CGUN)
 text(60, 786, "Gun sockets: pin 1 = Gun +, pin 2 = Gun -  (same as the C-420).", "n")
-text(60, 802, "Pins 4, 5 (purge button) are not wired: the board has no purge input.", "n")
-text(60, 818, "Pin 3 not used.  Keep gun wires away from eye / encoder wires.", "n")
+text(60, 802, "Pins 3, 4, 5 not wired (no purge buttons on this machine).", "n")
+text(60, 818, "Keep gun wires away from eye / encoder wires.", "n")
 
 # ---------------------------------------------------------------- encoder
 box(1280, 385, 180, 105, "ENC", fill="#fefce8")
