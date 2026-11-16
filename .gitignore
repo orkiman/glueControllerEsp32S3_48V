@@ -28,6 +28,9 @@ fp-info-cache
 hardware/*.pdf
 hardware/myLibs/**/*.bak
 
+# Manufacturer manuals (copyrighted) - kept local only, this repo is public
+docs/HHS/
+
 # GUI runtime log
 gui/debug.log
 gui/debug.log.*

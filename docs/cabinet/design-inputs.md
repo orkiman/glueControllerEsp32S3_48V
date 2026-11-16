@@ -1,0 +1,133 @@
+# Electrical cabinet — design inputs
+
+Working notes for the cabinet (3D-printed box) that will house the controller
+board, the power supplies and the connectors to the guns, the eye and the
+encoder.  Facts below were read from the board's KiCad files, the firmware and
+the manufacturer manuals of the old controller (Baumer hhs C-420) and the guns
+(hhs VD-50X-S).  The manuals themselves are copyrighted and are kept out of
+this (public) repository: `docs/HHS/` is git-ignored and exists only on the
+owner's PC.
+
+Status: nothing drawn yet.  Next step is the wiring diagram, then the physical
+box and the parts list.
+
+## 1. Decisions so far (owner)
+
+- Two 24 V supplies: one feeds the 24 V logic input, the second is stacked in
+  series on top of it to make 48 V for the guns.  Models not chosen yet.
+- Connectors on the box for guns, eye and encoder must accept the existing
+  cables of the old controller.
+- Eye: 24 V PNP.
+- Encoder: 24 V today, about 1-2 pulses per mm.  Must be possible to change
+  to a 5 V encoder later.
+- Box is 3D printed: Bambu Lab H2C (330 x 320 x 325 mm) or printed in China.
+- Operator screen: PC over USB and phone over WiFi today; a touch screen in
+  the box is "interesting" but not decided.
+
+## 2. The new board (from `hardware/` and `src/hw/Pins.h`)
+
+- PCB outline 118.7 x 93.0 mm.  Four M3 mounting holes; positions from the
+  outline's top-left corner (KiCad orientation, y down), in mm:
+  (6.0, 5.0), (113.7, 5.0), (24.5, 88.5), (94.7, 88.5).
+- ESP32-S3 DevKitC sits on two 1x22 socket headers (J1, J3).  Its USB port
+  (CP2102) is the PC link and the flashing port.
+- All field connectors are KF243 5.0 mm screw terminals:
+
+  | Ref | Poles | Function | Board edge |
+  | --- | ----- | -------- | ---------- |
+  | CN1 | 2 | 48 V in (guns) | left |
+  | CN2..CN5 | 2 each | Gun 1..4 | left |
+  | CN6 | 2 | 24 V in (logic) | right |
+  | CN7 | 2 | 5 V fast encoder input (6N137) | right |
+  | CN9 | 4 | 24 V inputs 1..4 (TLP291-4) | right |
+
+- 48 V GND and 24 V GND are the same net on the board.
+- CN9 carries four signal pins only: no +24 V and no 0 V for the sensors.
+  Sensor supply has to be distributed in the cabinet.
+- 24 V inputs are "24 V present = on" against board GND (4.7 k series
+  resistor into the opto LED): PNP / sourcing sensors only.
+- Input 1 = photocell (eye).  Inputs 2 and 3 are spare.  Input 4 = the
+  alternative 24 V encoder input; config `encoder_source` selects between it
+  and the fast input on CN7.
+- The 24 V inputs use a slow optocoupler (TLP291, 10 k pull-up).  Usable
+  encoder frequency on input 4 is limited; to be checked against the real
+  maximum (machine speed x pulses per mm).
+- CN7 is built for 5 V: series path is a green LED, an SS14 diode, 100 ohm
+  and the 6N137 LED.  A 24 V encoder could use this fast input through an
+  external series resistor of about 1.5 k / 1 W, with a jumper bypassing it
+  for a 5 V encoder.  Calculated from the schematic, not tested.
+- The board has no 5 V output terminal (a 5 V encoder needs its own 5 V
+  source in the cabinet) and no 24 V outputs at all.
+- Firmware limits: pick current max 1.5 A, hold current max 0.5 A per gun.
+
+## 3. Guns — hhs VD-50X-S (VD-503-S / VD-504-S)
+
+- Rated voltage 6 V DC, coil 11-12 ohm (troubleshooting table: about 13 ohm).
+  Hold 0.5 A x 12 ohm = 6 V, i.e. matches the rating.
+- Up to 1000 switching operations per second.
+- Has a pneumatic nozzle shutter ("flap"), 6 bar, operated by an
+  electro-pneumatic 3/2 valve that the hhs controller switches from its Flap
+  output.
+- Original cable: "V5 / P5", 2 / 3 / 3.5 / 5 m.
+
+## 4. Old controller — Baumer hhs C-420
+
+Technical data: mains 115/230 V, 160 VA, fuse 1 AT, IEC inlet.  Four gun
+outputs at +54 V, max 4 A.  Inputs 24 V PNP.  Two extra 24 V outputs, 0.5 A.
+Housing 225 x 205 x 110 mm, IP52.  Machine speed up to 300 m/min; encoder
+recommended at 1 mm per pulse, max 20 kHz.
+
+Rear panel: round panel connectors, an LED next to each.  The manual does not
+name the connector series; the drawing looks like the M16 "DIN" family.  A
+photo of the rear panel and of one plug (or its marking) is needed before
+ordering mating parts.
+
+| Connector | Poles | Pin functions |
+| --------- | ----- | ------------- |
+| Start 1..4 (eye) | 3 | 1 +24 V, 2 GND, 3 signal START |
+| Gun 1..4 | 5 | 1 Gun +, 2 Gun -, 3 n.c., 4 +24 V (purge button), 5 signal purge button |
+| ENC | 5 | 1 +24 V, 2 GND, 3 signal encoder, 4 n.c., 5 n.c. |
+| Reset | 3 | 1 +24 V, 2 n.c., 3 signal RESET |
+| Flap | 7 | 1 Flap out (24 V), 3 LEVEL out (24 V), 4 LEVEL out (GND), 6 Flap out (GND), others n.c. |
+| 0..20 mA | 8 | 1 +24 V, 2 GND, 3 signal LEVEL input, 4 + output 0..20 mA, 6 - output 0..20 mA, others n.c. |
+| Level in | 3 | 1 +24 V, 2 GND, 3 signal LEVEL input |
+| Level out | 5 | 1 n.c., 2 GND, 3 +24 V, 4 GND, 5 LEVEL out 24 V |
+| RS485 | D-sub 9 | 1 +24 V, 2 RXD, 3 TXD, 4 RS485_B, 5 GND, 8 RS485_A |
+| Power | IEC C14 | 115/230 V AC, fuse 1 AT |
+
+Flap output behaviour in the old controller: opens when the eye sees a
+product, closes a set time (1-25 s, default 8 s) after the eye signal goes
+away; always open in test mode.
+
+## 5. Old-controller functions the new board does not have
+
+- Flap (nozzle shutter) output, 24 V.
+- Purge button input per gun (on the gun cable, pins 4 and 5).
+- Glue level input / output, 0..20 mA pressure output, Reset input, RS485.
+
+## 6. Cabinet items raised so far (not yet decided)
+
+- Mains inlet with switch and fuse; protective earth to the supplies.
+- Emergency stop / machine interlock: what cuts the 48 V to the guns.
+- DC fuses on 48 V and on 24 V.
+- Series supplies: outputs must be isolated from earth, and each supply
+  needs a reverse-protection diode across its output.
+- Heat and material: PETG / ABS / ASA rather than PLA, ventilation, enclosed
+  supplies.
+- USB feed-through to the ESP32 for the PC; WiFi antenna kept away from the
+  supplies.
+- Spare inputs 2 and 3 brought out or not.
+- Front indicators (24 V, 48 V, fault) or a window to the board LEDs.
+- Gun cables kept apart from the encoder / eye cables; shielded encoder cable.
+- Service access: USB and reset button.
+- Lid as a replaceable panel, so a lid with a touch screen can be printed
+  later.  The screen would share the serial link with the PC (one at a time).
+
+## 7. Open questions to the owner
+
+1. Photo of the old controller's rear panel and of the plugs.
+2. Is the nozzle shutter (flap) used?
+3. Are there purge buttons on the gun cables, and should they keep working?
+4. Are glue level, pressure control or Reset used on this machine?
+5. Maximum machine speed (m/min).
+6. Emergency stop or a signal from the machine?  Where will the box be mounted?
