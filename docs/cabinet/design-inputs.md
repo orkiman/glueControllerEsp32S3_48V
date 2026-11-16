@@ -163,3 +163,27 @@ Gun: 5-pole 240 deg (order 1-2-3-4-5).  Part numbers: `parts-list.md`.
 - Touch screen size and model (stage 2).  Box concept: table-top console,
   sloped replaceable lid for the screen, all connectors on the rear wall.
 - Encoder on CN7 through 1.5 k: bench test before closing the box.
+
+## 10. Touch screen (stage 2) - decision 2026-11-16
+
+Owner chose an embedded HMI: a 10.1 inch touch panel with its own ESP32,
+UI written with LVGL, talking the existing NDJSON protocol to the controller
+over UART.  (Rejected: Raspberry Pi running the PySide6 GUI; Android tablet
+on the web UI.)
+
+Candidates found by web search (their product pages could not be opened from
+the cloud session, so the figures are from reviews and listings, unverified):
+
+| | Elecrow CrowPanel Advanced 10.1 | Waveshare ESP32-P4-WIFI6-Touch-LCD-10.1 |
+| --- | --- | --- |
+| MCU | ESP32-P4 + ESP32-C6 | ESP32-P4 + ESP32-C6 |
+| Resolution | 1024 x 600, landscape | 800 x 1280, native portrait |
+| Flash / PSRAM | 16 MB / 32 MB | 32 MB / 32 MB |
+| Outline | 257 x 163 x 10 mm | 246 x 156 x 12 mm |
+| Free UART | on headers | on the 40-pin header |
+| Price | about 54-60 USD | not found |
+
+Open points: which controller pins carry the HMI UART (UART0 is shared with
+the CP2102, so a second UART on spare pins is the likely answer); the
+controller's 2 s command watchdog means the HMI must ping; Hebrew (RTL)
+fonts in LVGL; 5 V supply current of the panel.
