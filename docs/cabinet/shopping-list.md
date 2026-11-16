@@ -29,7 +29,7 @@ DIN rail parts (replace the on-cable fuse holders and the lever connectors):
 | ---- | --- | ----- |
 | DIN rail 35 x 7.5 mm, perforated, 120 mm | 1 | cut from a longer piece |
 | Fuse terminal for 5x20 fuses, DIN rail | 4 | e.g. Phoenix Contact UT 4-HESI (5x20) - part name from memory, verify |
-| Feed-through terminal 2.5 mm2, DIN rail | 8 | 4 for 0 V, 3 for +24 V sensors, 1 spare; e.g. Phoenix UT 2,5 or Wago 2002 |
+| Feed-through terminal 2.5 mm2, DIN rail | 10 | 4 for 0 V, 3 for +24 V sensors, 2 for the encoder resistor, 1 spare; e.g. Phoenix UT 2,5 or Wago 2002 |
 | Push-in jumper bars for those terminals | 2-3 | to join the 0 V group and the +24 V group |
 | PE terminal, DIN rail | 1 | |
 | End stops for DIN rail | 2 | |

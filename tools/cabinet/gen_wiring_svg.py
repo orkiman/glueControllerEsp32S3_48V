@@ -2,7 +2,7 @@
 """Generates docs/cabinet/wiring-diagram.svg (cabinet wiring, draft)."""
 import os
 
-W, H = 1500, 900
+W, H = 1500, 910
 C48, C24, C0, CSIG, CGUN, CAC, CPE = ("#d62828", "#e07b00", "#1d4ed8", "#15803d",
                                       "#7c3aed", "#444", "#5a9a00")
 o = []
@@ -64,8 +64,8 @@ o.append('<style>.t{font-size:13px;fill:#222}.s{font-size:12px;fill:#333}'
          '.b{font-size:13px;font-weight:bold;fill:#111}.h{font-size:20px;font-weight:bold;fill:#111}'
          '.n{font-size:12px;fill:#555;font-style:italic}</style>')
 o.append(f'<rect width="{W}" height="{H}" fill="#fff"/>')
-text(30, 34, "Glue controller cabinet - wiring diagram (DRAFT 3)", "h")
-text(30, 54, "Fuse values and supply models are provisional. Dashed = optional / not decided.", "n")
+text(30, 34, "Glue controller cabinet - wiring diagram (DRAFT 4)", "h")
+text(30, 54, "Fuse values are provisional. Dashed = optional / not decided. X1 = DIN rail terminals (strip at the bottom).", "n")
 
 # ---------------------------------------------------------------- mains
 box(30, 130, 150, 120, "Mains inlet", ["IEC C14", "+ switch", "+ fuse F0 2 A T", "230 V AC"])
@@ -106,6 +106,7 @@ fuse(1065, 235, "F3", "0.5 A", C24)
 line([(1111, 235), (1200, 235), (1200, 640)], C24)
 text(560, 228, "+24 V", "b", col=C24)
 text(1210, 228, "+24 V sensors", "b", col=C24)
+text(1210, 212, "X1: 5-7", "s")
 
 # +24 V -> F4 -> 24 V / 5 V converter (touch screen stage, future 5 V encoder)
 dot(1000, 235, C24)
@@ -122,6 +123,7 @@ dot(1010, 285, C0)
 line([(1010, 285), (1010, 400), (960, 400)], C0)
 text(570, 302, "0 V", "b", col=C0)
 text(1232, 302, "0 V", "b", col=C0)
+text(1232, 318, "X1: 1-4", "s")
 # optional PE bond
 line([(520, 285), (520, 340)], CPE, 2.5, "6 4")
 text(512, 356, "PE bond, one point", "n", "end")
@@ -160,9 +162,9 @@ for i in range(4):
     pin(230, y, "1", "r"); pin(230, y + 30, "2", "r")
     line([(230, y), (700, y)], CGUN)
     line([(230, y + 30), (700, y + 30)], CGUN)
-text(60, 786, "Gun sockets: pin 1 = Gun +, pin 2 = Gun -  (same as the C-420).", "n")
-text(60, 802, "Pins 3, 4, 5 not wired (no purge buttons on this machine).", "n")
-text(60, 818, "Keep gun wires away from eye / encoder wires.", "n")
+text(60, 792, "Gun sockets: pin 1 = Gun +, pin 2 = Gun -  (same as the C-420).", "n")
+text(60, 808, "Pins 3, 4, 5 not wired (no purge buttons on this machine).", "n")
+text(60, 824, "Keep gun wires away from eye / encoder wires.", "n")
 
 # ---------------------------------------------------------------- encoder
 box(1280, 385, 180, 105, "ENC", fill="#fefce8")
@@ -172,12 +174,12 @@ pin(1280, 420, "1  +V", "l"); pin(1280, 445, "2  0 V", "l"); pin(1280, 470, "3  
 line([(1280, 420), (1200, 420)], C24); dot(1200, 420, C24)
 line([(1280, 445), (1225, 445)], C0);  dot(1225, 445, C0)
 # series resistor with bypass jumper
-box(1040, 440, 120, 44, "R1 1.5 k / 1 W", "JP1 bypasses R1", fill="#fff")
+box(1040, 440, 120, 44, "R1 1.5 k / 1 W", "X1: 8-9, JP1 = bridge", fill="#fff")
 line([(1280, 470), (1160, 470)], CSIG)
 line([(1040, 470), (960, 470)], CSIG)
 line([(960, 500), (1225, 500)], C0); dot(1225, 500, C0)
-text(1040, 520, "24 V encoder: JP1 open.", "n")
-text(1040, 536, "5 V encoder: JP1 closed", "n")
+text(1040, 520, "24 V encoder: no bridge 8-9.", "n")
+text(1040, 536, "5 V encoder: bridge 8-9.", "n")
 
 # ---------------------------------------------------------------- eye
 box(1280, 545, 180, 105, "EYE (START 1)", fill="#fefce8")
@@ -201,6 +203,20 @@ for i, (c, s) in enumerate([(C48, "+48 V (guns)"), (C24, "+24 V"), (C0, "0 V (co
     text(x + 42, y + 4, s, "s")
 text(1010, 850, "D-A, D-B: reverse-protection diode across each supply output,", "n")
 text(1010, 866, "cathode on V+, rated at least the supply current.", "n")
+
+# ---------------------------------------------------------------- DIN rail strip
+sx, sy = 60, 852
+text(sx, sy - 8, "X1 - DIN rail, left to right:", "b")
+cells = [("F1", C48, 34), ("F2", C24, 34), ("F3", C24, 34), ("F4", C24, 34)]
+cells += [(str(i), C0, 22) for i in (1, 2, 3, 4)] + [(str(i), C24, 22) for i in (5, 6, 7)]
+cells += [("8", CSIG, 22), ("9", CSIG, 22), ("PE", CPE, 30)]
+x = sx
+for lab, col, w in cells:
+    o.append(f'<rect x="{x}" y="{sy}" width="{w}" height="30" fill="#fff" stroke="{col}" stroke-width="2"/>')
+    text(x + w / 2, sy + 20, lab, "s", "middle")
+    x += w
+text(x + 12, sy + 12, "F1-F4 fuse terminals; 1-4 bridged (0 V);", "n")
+text(x + 12, sy + 28, "5-7 bridged (+24 V sensors); R1 between 8 and 9.", "n")
 
 o.append("</svg>")
 out = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "cabinet", "wiring-diagram.svg")

@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 900" width="1500" height="900" font-family="Arial, Helvetica, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 910" width="1500" height="910" font-family="Arial, Helvetica, sans-serif">
 <style>.t{font-size:13px;fill:#222}.s{font-size:12px;fill:#333}.b{font-size:13px;font-weight:bold;fill:#111}.h{font-size:20px;font-weight:bold;fill:#111}.n{font-size:12px;fill:#555;font-style:italic}</style>
-<rect width="1500" height="900" fill="#fff"/>
-<text x="30" y="34" class="h" text-anchor="start">Glue controller cabinet - wiring diagram (DRAFT 3)</text>
-<text x="30" y="54" class="n" text-anchor="start">Fuse values and supply models are provisional. Dashed = optional / not decided.</text>
+<rect width="1500" height="910" fill="#fff"/>
+<text x="30" y="34" class="h" text-anchor="start">Glue controller cabinet - wiring diagram (DRAFT 4)</text>
+<text x="30" y="54" class="n" text-anchor="start">Fuse values are provisional. Dashed = optional / not decided. X1 = DIN rail terminals (strip at the bottom).</text>
 <rect x="30" y="130" width="150" height="120" rx="6" fill="#f4f4f5" stroke="#222" stroke-width="1.5"/>
 <text x="105.0" y="148" text-anchor="middle" class="b">Mains inlet</text>
 <text x="105.0" y="165" text-anchor="middle" class="s">IEC C14</text>
@@ -69,6 +69,7 @@
 <polyline points="1111,235 1200,235 1200,640" fill="none" stroke="#e07b00" stroke-width="2.5"/>
 <text x="560" y="228" class="b" text-anchor="start" fill="#e07b00">+24 V</text>
 <text x="1210" y="228" class="b" text-anchor="start" fill="#e07b00">+24 V sensors</text>
+<text x="1210" y="212" class="s" text-anchor="start">X1: 5-7</text>
 <circle cx="1000" cy="235" r="4.5" fill="#e07b00"/>
 <polyline points="1000,235 1000,150 1065,150" fill="none" stroke="#e07b00" stroke-width="2.5" stroke-dasharray="6 4"/>
 <rect x="1065" y="141" width="46" height="18" rx="3" fill="#fff" stroke="#e07b00" stroke-width="2"/>
@@ -86,6 +87,7 @@
 <polyline points="1010,285 1010,400 960,400" fill="none" stroke="#1d4ed8" stroke-width="2.5"/>
 <text x="570" y="302" class="b" text-anchor="start" fill="#1d4ed8">0 V</text>
 <text x="1232" y="302" class="b" text-anchor="start" fill="#1d4ed8">0 V</text>
+<text x="1232" y="318" class="s" text-anchor="start">X1: 1-4</text>
 <polyline points="520,285 520,340" fill="none" stroke="#5a9a00" stroke-width="2.5" stroke-dasharray="6 4"/>
 <text x="512" y="356" class="n" text-anchor="end">PE bond, one point</text>
 <text x="512" y="372" class="n" text-anchor="end">(to decide)</text>
@@ -181,9 +183,9 @@
 <text x="221" y="744" class="s" text-anchor="end">2</text>
 <polyline points="230,710 700,710" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
 <polyline points="230,740 700,740" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
-<text x="60" y="786" class="n" text-anchor="start">Gun sockets: pin 1 = Gun +, pin 2 = Gun -  (same as the C-420).</text>
-<text x="60" y="802" class="n" text-anchor="start">Pins 3, 4, 5 not wired (no purge buttons on this machine).</text>
-<text x="60" y="818" class="n" text-anchor="start">Keep gun wires away from eye / encoder wires.</text>
+<text x="60" y="792" class="n" text-anchor="start">Gun sockets: pin 1 = Gun +, pin 2 = Gun -  (same as the C-420).</text>
+<text x="60" y="808" class="n" text-anchor="start">Pins 3, 4, 5 not wired (no purge buttons on this machine).</text>
+<text x="60" y="824" class="n" text-anchor="start">Keep gun wires away from eye / encoder wires.</text>
 <rect x="1280" y="385" width="180" height="105" rx="6" fill="#fefce8" stroke="#222" stroke-width="1.5"/>
 <text x="1370.0" y="403" text-anchor="middle" class="b">ENC</text>
 <text x="1405" y="440" class="s" text-anchor="middle">M16 5-pole</text>
@@ -200,13 +202,13 @@
 <circle cx="1225" cy="445" r="4.5" fill="#1d4ed8"/>
 <rect x="1040" y="440" width="120" height="44" rx="6" fill="#fff" stroke="#222" stroke-width="1.5"/>
 <text x="1100.0" y="458" text-anchor="middle" class="b">R1 1.5 k / 1 W</text>
-<text x="1100.0" y="475" text-anchor="middle" class="s">JP1 bypasses R1</text>
+<text x="1100.0" y="475" text-anchor="middle" class="s">X1: 8-9, JP1 = bridge</text>
 <polyline points="1280,470 1160,470" fill="none" stroke="#15803d" stroke-width="2.5"/>
 <polyline points="1040,470 960,470" fill="none" stroke="#15803d" stroke-width="2.5"/>
 <polyline points="960,500 1225,500" fill="none" stroke="#1d4ed8" stroke-width="2.5"/>
 <circle cx="1225" cy="500" r="4.5" fill="#1d4ed8"/>
-<text x="1040" y="520" class="n" text-anchor="start">24 V encoder: JP1 open.</text>
-<text x="1040" y="536" class="n" text-anchor="start">5 V encoder: JP1 closed</text>
+<text x="1040" y="520" class="n" text-anchor="start">24 V encoder: no bridge 8-9.</text>
+<text x="1040" y="536" class="n" text-anchor="start">5 V encoder: bridge 8-9.</text>
 <rect x="1280" y="545" width="180" height="105" rx="6" fill="#fefce8" stroke="#222" stroke-width="1.5"/>
 <text x="1370.0" y="563" text-anchor="middle" class="b">EYE (START 1)</text>
 <text x="1405" y="605" class="s" text-anchor="middle">M16 3-pole</text>
@@ -238,4 +240,35 @@
 <text x="1372" y="818" class="s" text-anchor="start">mains 230 V AC</text>
 <text x="1010" y="850" class="n" text-anchor="start">D-A, D-B: reverse-protection diode across each supply output,</text>
 <text x="1010" y="866" class="n" text-anchor="start">cathode on V+, rated at least the supply current.</text>
+<text x="60" y="844" class="b" text-anchor="start">X1 - DIN rail, left to right:</text>
+<rect x="60" y="852" width="34" height="30" fill="#fff" stroke="#d62828" stroke-width="2"/>
+<text x="77.0" y="872" class="s" text-anchor="middle">F1</text>
+<rect x="94" y="852" width="34" height="30" fill="#fff" stroke="#e07b00" stroke-width="2"/>
+<text x="111.0" y="872" class="s" text-anchor="middle">F2</text>
+<rect x="128" y="852" width="34" height="30" fill="#fff" stroke="#e07b00" stroke-width="2"/>
+<text x="145.0" y="872" class="s" text-anchor="middle">F3</text>
+<rect x="162" y="852" width="34" height="30" fill="#fff" stroke="#e07b00" stroke-width="2"/>
+<text x="179.0" y="872" class="s" text-anchor="middle">F4</text>
+<rect x="196" y="852" width="22" height="30" fill="#fff" stroke="#1d4ed8" stroke-width="2"/>
+<text x="207.0" y="872" class="s" text-anchor="middle">1</text>
+<rect x="218" y="852" width="22" height="30" fill="#fff" stroke="#1d4ed8" stroke-width="2"/>
+<text x="229.0" y="872" class="s" text-anchor="middle">2</text>
+<rect x="240" y="852" width="22" height="30" fill="#fff" stroke="#1d4ed8" stroke-width="2"/>
+<text x="251.0" y="872" class="s" text-anchor="middle">3</text>
+<rect x="262" y="852" width="22" height="30" fill="#fff" stroke="#1d4ed8" stroke-width="2"/>
+<text x="273.0" y="872" class="s" text-anchor="middle">4</text>
+<rect x="284" y="852" width="22" height="30" fill="#fff" stroke="#e07b00" stroke-width="2"/>
+<text x="295.0" y="872" class="s" text-anchor="middle">5</text>
+<rect x="306" y="852" width="22" height="30" fill="#fff" stroke="#e07b00" stroke-width="2"/>
+<text x="317.0" y="872" class="s" text-anchor="middle">6</text>
+<rect x="328" y="852" width="22" height="30" fill="#fff" stroke="#e07b00" stroke-width="2"/>
+<text x="339.0" y="872" class="s" text-anchor="middle">7</text>
+<rect x="350" y="852" width="22" height="30" fill="#fff" stroke="#15803d" stroke-width="2"/>
+<text x="361.0" y="872" class="s" text-anchor="middle">8</text>
+<rect x="372" y="852" width="22" height="30" fill="#fff" stroke="#15803d" stroke-width="2"/>
+<text x="383.0" y="872" class="s" text-anchor="middle">9</text>
+<rect x="394" y="852" width="30" height="30" fill="#fff" stroke="#5a9a00" stroke-width="2"/>
+<text x="409.0" y="872" class="s" text-anchor="middle">PE</text>
+<text x="436" y="864" class="n" text-anchor="start">F1-F4 fuse terminals; 1-4 bridged (0 V);</text>
+<text x="436" y="880" class="n" text-anchor="start">5-7 bridged (+24 V sensors); R1 between 8 and 9.</text>
 </svg>

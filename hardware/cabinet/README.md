@@ -9,8 +9,8 @@ Nothing has been printed or test-fitted yet.
 
 ## What it is
 
-Table-top console, 270 x 220 mm, 80 mm high at the front and 115 mm at the
-rear.  The lid is a flat 3 mm plate at 9 degrees, held by six M3 screws
+Table-top console, 270 x 220 mm, 80 mm high at the front and 140 mm at the
+rear.  The lid is a flat 3 mm plate at 15 degrees, held by six M3 screws
 into heat-set inserts, and is the part that gets replaced when the touch
 screen is added (up to 10.1 inch).  All connectors are on the rear wall.
 
@@ -35,7 +35,7 @@ wires go straight from the rear sockets to the board's screw terminals.
 - Supply fixing: the stack is located by ribs and clamped by the strap.
   Check against a real LRS-100-24, including access to the lower supply's
   terminal screws (wire it before the upper supply goes on).
-- Room under the lid above the supplies is 9 to 20 mm: enough for a bare
+- Room under the lid above the supplies is 10 to 45 mm: enough for a bare
   10.1 inch panel, to be rechecked when the screen is chosen.
 - DIN terminals are modelled as a 96 x 60 x 60 mm envelope; check against
   the chosen fuse terminals.  The 24 V to 5 V converter has no mounting

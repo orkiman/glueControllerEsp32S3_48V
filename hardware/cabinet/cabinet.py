@@ -16,9 +16,9 @@ from cadquery import exporters
 
 # ------------------------------------------------------------------ box
 W, D = 270.0, 220.0          # footprint
-HF, HR = 80.0, 115.0         # outer height at the front / at the rear
+HF, HR = 80.0, 140.0         # outer height at the front / at the rear
 T, FL, LID_T = 3.0, 3.0, 3.0  # wall, floor, lid thickness
-A = math.atan((HR - HF) / D)  # lid slope (about 9 deg)
+A = math.atan((HR - HF) / D)  # lid slope (about 15 deg)
 A_DEG = math.degrees(A)
 
 # ------------------------------------------------------------------ parts
