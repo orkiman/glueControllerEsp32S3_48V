@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 900" width="1500" height="900" font-family="Arial, Helvetica, sans-serif">
 <style>.t{font-size:13px;fill:#222}.s{font-size:12px;fill:#333}.b{font-size:13px;font-weight:bold;fill:#111}.h{font-size:20px;font-weight:bold;fill:#111}.n{font-size:12px;fill:#555;font-style:italic}</style>
 <rect width="1500" height="900" fill="#fff"/>
-<text x="30" y="34" class="h" text-anchor="start">Glue controller cabinet - wiring diagram (DRAFT 2)</text>
+<text x="30" y="34" class="h" text-anchor="start">Glue controller cabinet - wiring diagram (DRAFT 3)</text>
 <text x="30" y="54" class="n" text-anchor="start">Fuse values and supply models are provisional. Dashed = optional / not decided.</text>
 <rect x="30" y="130" width="150" height="120" rx="6" fill="#f4f4f5" stroke="#222" stroke-width="1.5"/>
 <text x="105.0" y="148" text-anchor="middle" class="b">Mains inlet</text>
@@ -69,6 +69,16 @@
 <polyline points="1111,235 1200,235 1200,640" fill="none" stroke="#e07b00" stroke-width="2.5"/>
 <text x="560" y="228" class="b" text-anchor="start" fill="#e07b00">+24 V</text>
 <text x="1210" y="228" class="b" text-anchor="start" fill="#e07b00">+24 V sensors</text>
+<circle cx="1000" cy="235" r="4.5" fill="#e07b00"/>
+<polyline points="1000,235 1000,150 1065,150" fill="none" stroke="#e07b00" stroke-width="2.5" stroke-dasharray="6 4"/>
+<rect x="1065" y="141" width="46" height="18" rx="3" fill="#fff" stroke="#e07b00" stroke-width="2"/>
+<text x="1088" y="135" class="b" text-anchor="middle">F4</text>
+<text x="1088" y="176" class="s" text-anchor="middle">2 A T</text>
+<polyline points="1111,150 1280,150" fill="none" stroke="#e07b00" stroke-width="2.5" stroke-dasharray="6 4"/>
+<rect x="1280" y="110" width="180" height="80" rx="6" fill="#fff" stroke="#222" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="1370.0" y="128" text-anchor="middle" class="b">DC/DC 24 V to 5 V, 3 A</text>
+<text x="1370.0" y="145" text-anchor="middle" class="s">touch screen (stage 2)</text>
+<text x="1370.0" y="160" text-anchor="middle" class="s">+ future 5 V encoder</text>
 <polyline points="420,285 1225,285 1225,640" fill="none" stroke="#1d4ed8" stroke-width="2.5"/>
 <circle cx="640" cy="285" r="4.5" fill="#1d4ed8"/>
 <polyline points="640,285 640,400 700,400" fill="none" stroke="#1d4ed8" stroke-width="2.5"/>
@@ -137,7 +147,7 @@
 <text x="838" y="790" class="n" text-anchor="start">USB cable to the DevKit</text>
 <rect x="60" y="442" width="170" height="72" rx="6" fill="#f5f3ff" stroke="#222" stroke-width="1.5"/>
 <text x="145.0" y="460" text-anchor="middle" class="b">GUN 1</text>
-<text x="145" y="476" class="s" text-anchor="middle">M16 5-pole socket</text>
+<text x="145" y="476" class="s" text-anchor="middle">M16 5-pole 240 deg</text>
 <circle cx="230" cy="470" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
 <text x="221" y="474" class="s" text-anchor="end">1</text>
 <circle cx="230" cy="500" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
@@ -146,7 +156,7 @@
 <polyline points="230,500 700,500" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
 <rect x="60" y="522" width="170" height="72" rx="6" fill="#f5f3ff" stroke="#222" stroke-width="1.5"/>
 <text x="145.0" y="540" text-anchor="middle" class="b">GUN 2</text>
-<text x="145" y="556" class="s" text-anchor="middle">M16 5-pole socket</text>
+<text x="145" y="556" class="s" text-anchor="middle">M16 5-pole 240 deg</text>
 <circle cx="230" cy="550" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
 <text x="221" y="554" class="s" text-anchor="end">1</text>
 <circle cx="230" cy="580" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
@@ -155,7 +165,7 @@
 <polyline points="230,580 700,580" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
 <rect x="60" y="602" width="170" height="72" rx="6" fill="#f5f3ff" stroke="#222" stroke-width="1.5"/>
 <text x="145.0" y="620" text-anchor="middle" class="b">GUN 3</text>
-<text x="145" y="636" class="s" text-anchor="middle">M16 5-pole socket</text>
+<text x="145" y="636" class="s" text-anchor="middle">M16 5-pole 240 deg</text>
 <circle cx="230" cy="630" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
 <text x="221" y="634" class="s" text-anchor="end">1</text>
 <circle cx="230" cy="660" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
@@ -164,7 +174,7 @@
 <polyline points="230,660 700,660" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
 <rect x="60" y="682" width="170" height="72" rx="6" fill="#f5f3ff" stroke="#222" stroke-width="1.5"/>
 <text x="145.0" y="700" text-anchor="middle" class="b">GUN 4</text>
-<text x="145" y="716" class="s" text-anchor="middle">M16 5-pole socket</text>
+<text x="145" y="716" class="s" text-anchor="middle">M16 5-pole 240 deg</text>
 <circle cx="230" cy="710" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
 <text x="221" y="714" class="s" text-anchor="end">1</text>
 <circle cx="230" cy="740" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
@@ -176,7 +186,8 @@
 <text x="60" y="818" class="n" text-anchor="start">Keep gun wires away from eye / encoder wires.</text>
 <rect x="1280" y="385" width="180" height="105" rx="6" fill="#fefce8" stroke="#222" stroke-width="1.5"/>
 <text x="1370.0" y="403" text-anchor="middle" class="b">ENC</text>
-<text x="1400" y="445" class="s" text-anchor="middle">5-pole</text>
+<text x="1405" y="440" class="s" text-anchor="middle">M16 5-pole</text>
+<text x="1405" y="455" class="s" text-anchor="middle">180 deg</text>
 <circle cx="1280" cy="420" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
 <text x="1289" y="424" class="s" text-anchor="start">1  +V</text>
 <circle cx="1280" cy="445" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
@@ -198,7 +209,7 @@
 <text x="1040" y="536" class="n" text-anchor="start">5 V encoder: JP1 closed</text>
 <rect x="1280" y="545" width="180" height="105" rx="6" fill="#fefce8" stroke="#222" stroke-width="1.5"/>
 <text x="1370.0" y="563" text-anchor="middle" class="b">EYE (START 1)</text>
-<text x="1400" y="605" class="s" text-anchor="middle">3-pole</text>
+<text x="1405" y="605" class="s" text-anchor="middle">M16 3-pole</text>
 <circle cx="1280" cy="580" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
 <text x="1289" y="584" class="s" text-anchor="start">1  +24 V</text>
 <circle cx="1280" cy="605" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>

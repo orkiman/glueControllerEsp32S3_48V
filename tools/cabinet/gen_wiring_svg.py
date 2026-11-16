@@ -64,7 +64,7 @@ o.append('<style>.t{font-size:13px;fill:#222}.s{font-size:12px;fill:#333}'
          '.b{font-size:13px;font-weight:bold;fill:#111}.h{font-size:20px;font-weight:bold;fill:#111}'
          '.n{font-size:12px;fill:#555;font-style:italic}</style>')
 o.append(f'<rect width="{W}" height="{H}" fill="#fff"/>')
-text(30, 34, "Glue controller cabinet - wiring diagram (DRAFT 2)", "h")
+text(30, 34, "Glue controller cabinet - wiring diagram (DRAFT 3)", "h")
 text(30, 54, "Fuse values and supply models are provisional. Dashed = optional / not decided.", "n")
 
 # ---------------------------------------------------------------- mains
@@ -106,6 +106,13 @@ fuse(1065, 235, "F3", "0.5 A", C24)
 line([(1111, 235), (1200, 235), (1200, 640)], C24)
 text(560, 228, "+24 V", "b", col=C24)
 text(1210, 228, "+24 V sensors", "b", col=C24)
+
+# +24 V -> F4 -> 24 V / 5 V converter (touch screen stage, future 5 V encoder)
+dot(1000, 235, C24)
+line([(1000, 235), (1000, 150), (1065, 150)], C24, 2.5, "6 4")
+fuse(1065, 150, "F4", "2 A T", C24)
+line([(1111, 150), (1280, 150)], C24, 2.5, "6 4")
+box(1280, 110, 180, 80, "DC/DC 24 V to 5 V, 3 A", ["touch screen (stage 2)", "+ future 5 V encoder"], fill="#fff", dash=True)
 
 # 0 V
 line([(420, 285), (1225, 285), (1225, 640)], C0)
@@ -149,7 +156,7 @@ text(838, 790, "USB cable to the DevKit", "n")
 for i in range(4):
     y = 470 + 80 * i
     box(60, y - 28, 170, 72, f"GUN {i + 1}", fill="#f5f3ff")
-    text(145, y + 6, "M16 5-pole socket", "s", "middle")
+    text(145, y + 6, "M16 5-pole 240 deg", "s", "middle")
     pin(230, y, "1", "r"); pin(230, y + 30, "2", "r")
     line([(230, y), (700, y)], CGUN)
     line([(230, y + 30), (700, y + 30)], CGUN)
@@ -159,7 +166,8 @@ text(60, 818, "Keep gun wires away from eye / encoder wires.", "n")
 
 # ---------------------------------------------------------------- encoder
 box(1280, 385, 180, 105, "ENC", fill="#fefce8")
-text(1400, 445, "5-pole", "s", "middle")
+text(1405, 440, "M16 5-pole", "s", "middle")
+text(1405, 455, "180 deg", "s", "middle")
 pin(1280, 420, "1  +V", "l"); pin(1280, 445, "2  0 V", "l"); pin(1280, 470, "3  signal", "l")
 line([(1280, 420), (1200, 420)], C24); dot(1200, 420, C24)
 line([(1280, 445), (1225, 445)], C0);  dot(1225, 445, C0)
@@ -173,7 +181,7 @@ text(1040, 536, "5 V encoder: JP1 closed", "n")
 
 # ---------------------------------------------------------------- eye
 box(1280, 545, 180, 105, "EYE (START 1)", fill="#fefce8")
-text(1400, 605, "3-pole", "s", "middle")
+text(1405, 605, "M16 3-pole", "s", "middle")
 pin(1280, 580, "1  +24 V", "l"); pin(1280, 605, "2  0 V", "l"); pin(1280, 630, "3  signal", "l")
 line([(1280, 580), (1200, 580)], C24); dot(1200, 580, C24)
 line([(1280, 605), (1225, 605)], C0);  dot(1225, 605, C0)
