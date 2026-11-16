@@ -1,0 +1,234 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 900" width="1500" height="900" font-family="Arial, Helvetica, sans-serif">
+<style>.t{font-size:13px;fill:#222}.s{font-size:12px;fill:#333}.b{font-size:13px;font-weight:bold;fill:#111}.h{font-size:20px;font-weight:bold;fill:#111}.n{font-size:12px;fill:#555;font-style:italic}</style>
+<rect width="1500" height="900" fill="#fff"/>
+<text x="30" y="34" class="h" text-anchor="start">Glue controller cabinet - wiring diagram (DRAFT 1)</text>
+<text x="30" y="54" class="n" text-anchor="start">Fuse values and supply models are provisional. Dashed = optional / not decided.</text>
+<rect x="30" y="130" width="150" height="120" rx="6" fill="#f4f4f5" stroke="#222" stroke-width="1.5"/>
+<text x="105.0" y="148" text-anchor="middle" class="b">Mains inlet</text>
+<text x="105.0" y="165" text-anchor="middle" class="s">IEC C14</text>
+<text x="105.0" y="180" text-anchor="middle" class="s">+ switch</text>
+<text x="105.0" y="195" text-anchor="middle" class="s">+ fuse F0 2 A T</text>
+<text x="105.0" y="210" text-anchor="middle" class="s">230 V AC</text>
+<polyline points="180,190 215,190" fill="none" stroke="#444" stroke-width="5"/>
+<polyline points="215,110 215,260" fill="none" stroke="#444" stroke-width="5"/>
+<polyline points="215,110 250,110" fill="none" stroke="#444" stroke-width="5"/>
+<polyline points="215,260 250,260" fill="none" stroke="#444" stroke-width="5"/>
+<circle cx="215" cy="190" r="4.5" fill="#444"/>
+<text x="110" y="268" class="s" text-anchor="middle">L, N, PE</text>
+<rect x="250" y="60" width="170" height="100" rx="6" fill="#f4f4f5" stroke="#222" stroke-width="1.5"/>
+<text x="335.0" y="78" text-anchor="middle" class="b">PSU-B  24 V</text>
+<text x="335.0" y="95" text-anchor="middle" class="s">upper stage</text>
+<text x="335.0" y="110" text-anchor="middle" class="s">(makes the 48 V)</text>
+<rect x="250" y="210" width="170" height="100" rx="6" fill="#f4f4f5" stroke="#222" stroke-width="1.5"/>
+<text x="335.0" y="228" text-anchor="middle" class="b">PSU-A  24 V</text>
+<text x="335.0" y="245" text-anchor="middle" class="s">lower stage</text>
+<text x="335.0" y="260" text-anchor="middle" class="s">(logic + sensors)</text>
+<circle cx="420" cy="85" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="411" y="89" class="s" text-anchor="end">V+</text>
+<circle cx="420" cy="135" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="411" y="139" class="s" text-anchor="end">V-</text>
+<circle cx="420" cy="235" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="411" y="239" class="s" text-anchor="end">V+</text>
+<circle cx="420" cy="285" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="411" y="289" class="s" text-anchor="end">V-</text>
+<polyline points="420,135 480,135" fill="none" stroke="#e07b00" stroke-width="2.5"/>
+<polyline points="450,135 450,235" fill="none" stroke="#e07b00" stroke-width="2.5"/>
+<circle cx="450" cy="135" r="4.5" fill="#e07b00"/>
+<circle cx="450" cy="235" r="4.5" fill="#e07b00"/>
+<text x="456" y="190" class="n" text-anchor="start">series</text>
+<text x="456" y="204" class="n" text-anchor="start">link</text>
+<polyline points="480,85 480,102.0" fill="none" stroke="#222" stroke-width="2"/>
+<polyline points="480,118.0 480,135" fill="none" stroke="#222" stroke-width="2"/>
+<polygon points="471,118.0 489,118.0 480,102.0" fill="#222"/>
+<polyline points="471,102.0 489,102.0" fill="none" stroke="#222" stroke-width="2.5"/>
+<text x="494" y="114.0" class="s" text-anchor="start">D-B</text>
+<circle cx="480" cy="85" r="4.5" fill="#d62828"/>
+<polyline points="480,235 480,252.0" fill="none" stroke="#222" stroke-width="2"/>
+<polyline points="480,268.0 480,285" fill="none" stroke="#222" stroke-width="2"/>
+<polygon points="471,268.0 489,268.0 480,252.0" fill="#222"/>
+<polyline points="471,252.0 489,252.0" fill="none" stroke="#222" stroke-width="2.5"/>
+<text x="494" y="264.0" class="s" text-anchor="start">D-A</text>
+<circle cx="480" cy="235" r="4.5" fill="#e07b00"/>
+<circle cx="480" cy="285" r="4.5" fill="#1d4ed8"/>
+<polyline points="420,85 520,85" fill="none" stroke="#d62828" stroke-width="2.5"/>
+<rect x="520" y="76" width="46" height="18" rx="3" fill="#fff" stroke="#d62828" stroke-width="2"/>
+<text x="543" y="70" class="b" text-anchor="middle">F1</text>
+<text x="543" y="111" class="s" text-anchor="middle">4 A T</text>
+<polyline points="566,85 585,85" fill="none" stroke="#d62828" stroke-width="2.5"/>
+<rect x="585" y="70" width="60" height="30" rx="4" fill="#fff" stroke="#222" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="640" y="62" class="b" text-anchor="middle">X1 E-stop / interlock</text>
+<text x="615" y="90" class="s" text-anchor="middle">link</text>
+<polyline points="645,85 665,85 665,370 700,370" fill="none" stroke="#d62828" stroke-width="2.5"/>
+<text x="672" y="200" class="b" text-anchor="start" fill="#d62828">+48 V</text>
+<polyline points="420,235 740,235" fill="none" stroke="#e07b00" stroke-width="2.5"/>
+<rect x="740" y="226" width="46" height="18" rx="3" fill="#fff" stroke="#e07b00" stroke-width="2"/>
+<text x="763" y="220" class="b" text-anchor="middle">F2</text>
+<text x="763" y="261" class="s" text-anchor="middle">1 A T</text>
+<polyline points="786,235 1065,235" fill="none" stroke="#e07b00" stroke-width="2.5"/>
+<circle cx="1030" cy="235" r="4.5" fill="#e07b00"/>
+<polyline points="1030,235 1030,370 960,370" fill="none" stroke="#e07b00" stroke-width="2.5"/>
+<rect x="1065" y="226" width="46" height="18" rx="3" fill="#fff" stroke="#e07b00" stroke-width="2"/>
+<text x="1088" y="220" class="b" text-anchor="middle">F3</text>
+<text x="1088" y="261" class="s" text-anchor="middle">0.5 A</text>
+<polyline points="1111,235 1200,235 1200,640" fill="none" stroke="#e07b00" stroke-width="2.5"/>
+<text x="560" y="228" class="b" text-anchor="start" fill="#e07b00">+24 V</text>
+<text x="1210" y="228" class="b" text-anchor="start" fill="#e07b00">+24 V sensors</text>
+<polyline points="420,285 1225,285 1225,640" fill="none" stroke="#1d4ed8" stroke-width="2.5"/>
+<circle cx="640" cy="285" r="4.5" fill="#1d4ed8"/>
+<polyline points="640,285 640,400 700,400" fill="none" stroke="#1d4ed8" stroke-width="2.5"/>
+<circle cx="1010" cy="285" r="4.5" fill="#1d4ed8"/>
+<polyline points="1010,285 1010,400 960,400" fill="none" stroke="#1d4ed8" stroke-width="2.5"/>
+<text x="570" y="302" class="b" text-anchor="start" fill="#1d4ed8">0 V</text>
+<text x="1232" y="302" class="b" text-anchor="start" fill="#1d4ed8">0 V</text>
+<polyline points="520,285 520,340" fill="none" stroke="#5a9a00" stroke-width="2.5" stroke-dasharray="6 4"/>
+<text x="512" y="356" class="n" text-anchor="end">PE bond, one point</text>
+<text x="512" y="372" class="n" text-anchor="end">(to decide)</text>
+<rect x="700" y="330" width="260" height="440" rx="6" fill="#ecfdf5" stroke="#222" stroke-width="1.5"/>
+<text x="830.0" y="348" text-anchor="middle" class="b">Controller board</text>
+<text x="830" y="366" class="s" text-anchor="middle">ESP32-S3 DevKitC</text>
+<text x="830" y="381" class="s" text-anchor="middle">on J1 / J3</text>
+<text x="708" y="358" class="b" text-anchor="start">CN1</text>
+<circle cx="700" cy="370" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="709" y="374" class="s" text-anchor="start">1  +48 V in</text>
+<circle cx="700" cy="400" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="709" y="404" class="s" text-anchor="start">2  GND</text>
+<text x="708" y="458" class="b" text-anchor="start">CN2</text>
+<circle cx="700" cy="470" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="709" y="474" class="s" text-anchor="start">1  Gun 1</text>
+<circle cx="700" cy="500" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="709" y="504" class="s" text-anchor="start">2  Gun 1</text>
+<text x="708" y="538" class="b" text-anchor="start">CN3</text>
+<circle cx="700" cy="550" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="709" y="554" class="s" text-anchor="start">1  Gun 2</text>
+<circle cx="700" cy="580" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="709" y="584" class="s" text-anchor="start">2  Gun 2</text>
+<text x="708" y="618" class="b" text-anchor="start">CN4</text>
+<circle cx="700" cy="630" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="709" y="634" class="s" text-anchor="start">1  Gun 3</text>
+<circle cx="700" cy="660" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="709" y="664" class="s" text-anchor="start">2  Gun 3</text>
+<text x="708" y="698" class="b" text-anchor="start">CN5</text>
+<circle cx="700" cy="710" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="709" y="714" class="s" text-anchor="start">1  Gun 4</text>
+<circle cx="700" cy="740" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="709" y="744" class="s" text-anchor="start">2  Gun 4</text>
+<text x="952" y="358" class="b" text-anchor="end">CN6</text>
+<circle cx="960" cy="370" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="951" y="374" class="s" text-anchor="end">+24 V in  1</text>
+<circle cx="960" cy="400" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="951" y="404" class="s" text-anchor="end">GND  2</text>
+<text x="952" y="458" class="b" text-anchor="end">CN7  fast encoder in</text>
+<circle cx="960" cy="470" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="951" y="474" class="s" text-anchor="end">ENC +  1</text>
+<circle cx="960" cy="500" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="951" y="504" class="s" text-anchor="end">ENC -  2</text>
+<text x="952" y="558" class="b" text-anchor="end">CN9  24 V inputs</text>
+<circle cx="960" cy="570" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="951" y="574" class="s" text-anchor="end">IN1 eye  1</text>
+<circle cx="960" cy="600" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="951" y="604" class="s" text-anchor="end">IN2 spare  2</text>
+<circle cx="960" cy="630" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="951" y="634" class="s" text-anchor="end">IN3 spare  3</text>
+<circle cx="960" cy="660" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="951" y="664" class="s" text-anchor="end">IN4 (24 V enc. alt.)  4</text>
+<polyline points="960,600 985,600" fill="none" stroke="#15803d" stroke-width="2" stroke-dasharray="5 4"/>
+<polyline points="960,630 985,630" fill="none" stroke="#15803d" stroke-width="2" stroke-dasharray="5 4"/>
+<polyline points="960,660 985,660" fill="none" stroke="#15803d" stroke-width="2" stroke-dasharray="5 4"/>
+<rect x="770" y="800" width="120" height="46" rx="6" fill="#f4f4f5" stroke="#222" stroke-width="1.5"/>
+<text x="830.0" y="818" text-anchor="middle" class="b">USB panel socket</text>
+<text x="830.0" y="835" text-anchor="middle" class="s">to the PC</text>
+<polyline points="830,770 830,800" fill="none" stroke="#666" stroke-width="3"/>
+<text x="838" y="790" class="n" text-anchor="start">USB cable to the DevKit</text>
+<rect x="60" y="442" width="170" height="72" rx="6" fill="#f5f3ff" stroke="#222" stroke-width="1.5"/>
+<text x="145.0" y="460" text-anchor="middle" class="b">GUN 1</text>
+<text x="145" y="476" class="s" text-anchor="middle">5-pole socket</text>
+<circle cx="230" cy="470" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="221" y="474" class="s" text-anchor="end">1</text>
+<circle cx="230" cy="500" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="221" y="504" class="s" text-anchor="end">2</text>
+<polyline points="230,470 700,470" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
+<polyline points="230,500 700,500" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
+<rect x="60" y="522" width="170" height="72" rx="6" fill="#f5f3ff" stroke="#222" stroke-width="1.5"/>
+<text x="145.0" y="540" text-anchor="middle" class="b">GUN 2</text>
+<text x="145" y="556" class="s" text-anchor="middle">5-pole socket</text>
+<circle cx="230" cy="550" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="221" y="554" class="s" text-anchor="end">1</text>
+<circle cx="230" cy="580" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="221" y="584" class="s" text-anchor="end">2</text>
+<polyline points="230,550 700,550" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
+<polyline points="230,580 700,580" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
+<rect x="60" y="602" width="170" height="72" rx="6" fill="#f5f3ff" stroke="#222" stroke-width="1.5"/>
+<text x="145.0" y="620" text-anchor="middle" class="b">GUN 3</text>
+<text x="145" y="636" class="s" text-anchor="middle">5-pole socket</text>
+<circle cx="230" cy="630" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="221" y="634" class="s" text-anchor="end">1</text>
+<circle cx="230" cy="660" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="221" y="664" class="s" text-anchor="end">2</text>
+<polyline points="230,630 700,630" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
+<polyline points="230,660 700,660" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
+<rect x="60" y="682" width="170" height="72" rx="6" fill="#f5f3ff" stroke="#222" stroke-width="1.5"/>
+<text x="145.0" y="700" text-anchor="middle" class="b">GUN 4</text>
+<text x="145" y="716" class="s" text-anchor="middle">5-pole socket</text>
+<circle cx="230" cy="710" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="221" y="714" class="s" text-anchor="end">1</text>
+<circle cx="230" cy="740" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="221" y="744" class="s" text-anchor="end">2</text>
+<polyline points="230,710 700,710" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
+<polyline points="230,740 700,740" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
+<text x="60" y="786" class="n" text-anchor="start">Gun sockets: pin 1 = Gun +, pin 2 = Gun -  (same as the C-420).</text>
+<text x="60" y="802" class="n" text-anchor="start">Pins 4, 5 (purge button) are not wired: the board has no purge input.</text>
+<text x="60" y="818" class="n" text-anchor="start">Pin 3 not used.  Keep gun wires away from eye / encoder wires.</text>
+<rect x="1280" y="385" width="180" height="105" rx="6" fill="#fefce8" stroke="#222" stroke-width="1.5"/>
+<text x="1370.0" y="403" text-anchor="middle" class="b">ENC</text>
+<text x="1400" y="445" class="s" text-anchor="middle">5-pole</text>
+<circle cx="1280" cy="420" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="1289" y="424" class="s" text-anchor="start">1  +V</text>
+<circle cx="1280" cy="445" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="1289" y="449" class="s" text-anchor="start">2  0 V</text>
+<circle cx="1280" cy="470" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="1289" y="474" class="s" text-anchor="start">3  signal</text>
+<polyline points="1280,420 1200,420" fill="none" stroke="#e07b00" stroke-width="2.5"/>
+<circle cx="1200" cy="420" r="4.5" fill="#e07b00"/>
+<polyline points="1280,445 1225,445" fill="none" stroke="#1d4ed8" stroke-width="2.5"/>
+<circle cx="1225" cy="445" r="4.5" fill="#1d4ed8"/>
+<rect x="1040" y="440" width="120" height="44" rx="6" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="1100.0" y="458" text-anchor="middle" class="b">R1 1.5 k / 1 W</text>
+<text x="1100.0" y="475" text-anchor="middle" class="s">JP1 bypasses R1</text>
+<polyline points="1280,470 1160,470" fill="none" stroke="#15803d" stroke-width="2.5"/>
+<polyline points="1040,470 960,470" fill="none" stroke="#15803d" stroke-width="2.5"/>
+<polyline points="960,500 1225,500" fill="none" stroke="#1d4ed8" stroke-width="2.5"/>
+<circle cx="1225" cy="500" r="4.5" fill="#1d4ed8"/>
+<text x="1040" y="520" class="n" text-anchor="start">24 V encoder: JP1 open.</text>
+<text x="1040" y="536" class="n" text-anchor="start">5 V encoder: JP1 closed</text>
+<rect x="1280" y="545" width="180" height="105" rx="6" fill="#fefce8" stroke="#222" stroke-width="1.5"/>
+<text x="1370.0" y="563" text-anchor="middle" class="b">EYE (START 1)</text>
+<text x="1400" y="605" class="s" text-anchor="middle">3-pole</text>
+<circle cx="1280" cy="580" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="1289" y="584" class="s" text-anchor="start">1  +24 V</text>
+<circle cx="1280" cy="605" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="1289" y="609" class="s" text-anchor="start">2  0 V</text>
+<circle cx="1280" cy="630" r="4" fill="#fff" stroke="#222" stroke-width="1.5"/>
+<text x="1289" y="634" class="s" text-anchor="start">3  signal</text>
+<polyline points="1280,580 1200,580" fill="none" stroke="#e07b00" stroke-width="2.5"/>
+<circle cx="1200" cy="580" r="4.5" fill="#e07b00"/>
+<polyline points="1280,605 1225,605" fill="none" stroke="#1d4ed8" stroke-width="2.5"/>
+<circle cx="1225" cy="605" r="4.5" fill="#1d4ed8"/>
+<polyline points="1280,630 1240,630 1240,670 1000,670 1000,570 960,570" fill="none" stroke="#15803d" stroke-width="2.5"/>
+<text x="1010" y="700" class="n" text-anchor="start">5 V encoder (future): feed ENC pin 1 from a small</text>
+<text x="1010" y="716" class="n" text-anchor="start">24 V to 5 V converter instead of the +24 V rail.</text>
+<text x="1010" y="740" class="n" text-anchor="start">Sensors must be PNP (switch +24 V to the input).</text>
+<polyline points="1010,790 1044,790" fill="none" stroke="#d62828" stroke-width="4"/>
+<text x="1052" y="794" class="s" text-anchor="start">+48 V (guns)</text>
+<polyline points="1170,790 1204,790" fill="none" stroke="#e07b00" stroke-width="4"/>
+<text x="1212" y="794" class="s" text-anchor="start">+24 V</text>
+<polyline points="1330,790 1364,790" fill="none" stroke="#1d4ed8" stroke-width="4"/>
+<text x="1372" y="794" class="s" text-anchor="start">0 V (common)</text>
+<polyline points="1010,814 1044,814" fill="none" stroke="#15803d" stroke-width="4"/>
+<text x="1052" y="818" class="s" text-anchor="start">signal</text>
+<polyline points="1170,814 1204,814" fill="none" stroke="#7c3aed" stroke-width="4"/>
+<text x="1212" y="818" class="s" text-anchor="start">gun coil</text>
+<polyline points="1330,814 1364,814" fill="none" stroke="#444" stroke-width="5"/>
+<text x="1372" y="818" class="s" text-anchor="start">mains 230 V AC</text>
+<text x="1010" y="850" class="n" text-anchor="start">D-A, D-B: reverse-protection diode across each supply output,</text>
+<text x="1010" y="866" class="n" text-anchor="start">cathode on V+, rated at least the supply current.</text>
+</svg>
