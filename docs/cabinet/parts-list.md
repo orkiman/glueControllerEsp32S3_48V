@@ -30,9 +30,9 @@ Wiring: Gun pin 1 = Gun +, pin 2 = Gun -.  ENC pin 1 = +24 V, 2 = 0 V,
 | PSU-A, PSU-B | 2 | Mean Well LRS-100-24 (24 V, 4.5 A, 129 x 97 x 30 mm, no fan) | Stacked in series for 48 V.  Old controller was 160 VA in total, so 2 x 108 W leaves margin for the screen. |
 | D-A, D-B | 2 | 6A10 (6 A, 1000 V) or similar | Across each supply output, cathode on V+. |
 | Mains inlet | 1 | IEC C14 with switch and 5x20 fuse holder | F0 2 A slow. |
-| F1 (48 V) | 1 | 5x20 holder, 4 A slow | Provisional. |
-| F2 (24 V board) | 1 | 5x20 holder, 1 A slow | |
-| F3 (24 V sensors) | 1 | 5x20 holder, 0.5 A | |
+| F1 (48 V) | 1 | DIN-rail fuse terminal 5x20, 4 A slow | Provisional. |
+| F2 (24 V board) | 1 | DIN-rail fuse terminal 5x20, 1 A slow | |
+| F3 (24 V sensors) | 1 | DIN-rail fuse terminal 5x20, 0.5 A | |
 | F4 + DC/DC 24 V to 5 V, 3 A | 1 | Model to choose with the screen | Stage 2: touch screen, future 5 V encoder. |
 
 ## Small parts
@@ -41,7 +41,7 @@ Wiring: Gun pin 1 = Gun +, pin 2 = Gun -.  ENC pin 1 = +24 V, 2 = 0 V,
 | ---- | --- | ----- |
 | R1 1.5 k, 1 W, with jumper JP1 | 1 | Encoder series resistor for 24 V; JP1 closed for 5 V. |
 | USB panel feed-through (to the DevKit's USB port) | 1 | PC link and flashing. |
-| Terminal blocks for +24 V sensors / 0 V / PE | - | |
+| 35 mm DIN rail, 120 mm, with 4 fuse terminals (F1-F4), 0 V group, +24 V sensors group, PE terminal | 1 | See shopping-list.md. |
 | M3 brass heat-set inserts, M3 screws, 4 PCB standoffs | - | Board holes: see design-inputs.md section 2. |
 | Wire: 0.75 mm2 for 48 V and guns, 0.25-0.5 mm2 for signals, 3 x 0.75 mm2 mains | - | |
 

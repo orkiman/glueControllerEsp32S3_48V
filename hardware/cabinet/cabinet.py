@@ -15,10 +15,10 @@ import cadquery as cq
 from cadquery import exporters
 
 # ------------------------------------------------------------------ box
-W, D = 270.0, 190.0          # footprint
+W, D = 270.0, 220.0          # footprint
 HF, HR = 80.0, 115.0         # outer height at the front / at the rear
 T, FL, LID_T = 3.0, 3.0, 3.0  # wall, floor, lid thickness
-A = math.atan((HR - HF) / D)  # lid slope (about 10.4 deg)
+A = math.atan((HR - HF) / D)  # lid slope (about 9 deg)
 A_DEG = math.degrees(A)
 
 # ------------------------------------------------------------------ parts
@@ -47,6 +47,12 @@ LID_BOSSES = [(BOSS / 2 + 1, BOSS / 2 + 1), (W - BOSS / 2 - 1, BOSS / 2 + 1),
 POST_X, POST_Y, POST_SX, POST_SY = 107.0, 70.0, 10.0, 12.0   # PSU strap post
 STACK_TOP = FL + 2 * PSU_H + PSU_GAP                          # 73
 STRAP_T = 4.0
+# 35 mm DIN rail for the fuse terminals and the 0 V / +24 V / PE terminals,
+# between the board and the rear sockets.  Fixed with two M3 screws.
+RAIL_X0, RAIL_LEN, RAIL_Y = 135.0, 120.0, 150.0
+RAIL_BOSS_X = (RAIL_X0 + 10.0, RAIL_X0 + 110.0)   # 100 mm apart: rail slots are on a 25 mm pitch
+RAIL_BOSS_H = 5.0
+TERMINAL_LEN, TERMINAL_H = 60.0, 60.0             # envelope of the terminals on the rail (VERIFY)
 
 
 def zt(y):
@@ -105,6 +111,11 @@ def make_body():
         body = body.union(zcyl(x, y, 8.0, 0, FL + PCB_STANDOFF))
         body = body.cut(zcyl(x, y, INSERT_D, FL + PCB_STANDOFF - INSERT_DEPTH, FL + PCB_STANDOFF + 1))
 
+    # --- DIN rail bosses
+    for x in RAIL_BOSS_X:
+        body = body.union(zcyl(x, RAIL_Y, 10.0, 0, FL + RAIL_BOSS_H))
+        body = body.cut(zcyl(x, RAIL_Y, INSERT_D, FL + RAIL_BOSS_H - INSERT_DEPTH, FL + RAIL_BOSS_H + 1))
+
     # --- insert pockets: lid bosses (along the lid normal) and strap post
     for x, y in LID_BOSSES:
         body = body.cut(lid_normal_cyl(x, y, INSERT_D, 9, 1))
@@ -131,8 +142,8 @@ def make_body():
         for i in range(13):
             y = 20 + i * 9
             body = body.cut(box(x0, x0 + T + 2, y, y + 3, 15, 45))
-        for i in range(7):
-            y = 118 + i * 9
+        for i in range(9):
+            y = 130 + i * 9
             body = body.cut(box(x0, x0 + T + 2, y, y + 3, 62, 90))
     return body
 
@@ -168,6 +179,12 @@ def dummies():
     out.append(box(PCB_X0 + 62, PCB_X0 + 92, PCB_Y0 + 20, PCB_Y0 + 88, z + 1.6, z + 22))   # DevKit
     for x0 in (PCB_X0 + 2, PCB_X0 + PCB_W - 10):                                            # terminals
         out.append(box(x0, x0 + 8, PCB_Y0 + 5, PCB_Y0 + 80, z + 1.6, z + 16))
+    z = FL + RAIL_BOSS_H
+    out.append(box(RAIL_X0, RAIL_X0 + RAIL_LEN, RAIL_Y - 17.5, RAIL_Y + 17.5, z, z + 7.5))            # rail
+    out.append(box(RAIL_X0 + 12, RAIL_X0 + 108, RAIL_Y - TERMINAL_LEN / 2, RAIL_Y + TERMINAL_LEN / 2,
+                   z + 7.5, z + TERMINAL_H))                                                           # terminals
+    for i in range(6):                                                                                # M16 socket bodies
+        out.append(ycyl(M16_X0 + i * M16_PITCH, M16_Z, 20.0, D - T - 28, D - T))
     return out
 
 

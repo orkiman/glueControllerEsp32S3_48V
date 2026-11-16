@@ -9,8 +9,8 @@ Nothing has been printed or test-fitted yet.
 
 ## What it is
 
-Table-top console, 270 x 190 mm, 80 mm high at the front and 115 mm at the
-rear.  The lid is a flat 3 mm plate at 10.4 degrees, held by six M3 screws
+Table-top console, 270 x 220 mm, 80 mm high at the front and 115 mm at the
+rear.  The lid is a flat 3 mm plate at 9 degrees, held by six M3 screws
 into heat-set inserts, and is the part that gets replaced when the touch
 screen is added (up to 10.1 inch).  All connectors are on the rear wall.
 
@@ -22,8 +22,10 @@ screen is added (up to 10.1 inch).  All connectors are on the rear wall.
 | `cabinet_psu_strap` | Bar that clamps the supply stack; tab goes into the left wall, M3 screw into the post | Flat |
 
 Inside, seen from the front: the two supplies are stacked at the left, the
-controller board is on four standoffs at the right, and the 45 mm behind
-them is free for the connector bodies, fuses and terminal blocks.
+controller board is on four standoffs at the right, and behind the board
+is a 120 mm piece of 35 mm DIN rail (two M3 bosses) for the fuse terminals
+and the 0 V / +24 V / PE terminals.  Gun, eye-signal and encoder-signal
+wires go straight from the rear sockets to the board's screw terminals.
 
 ## To verify before printing
 
@@ -35,6 +37,7 @@ them is free for the connector bodies, fuses and terminal blocks.
   terminal screws (wire it before the upper supply goes on).
 - Room under the lid above the supplies is 9 to 20 mm: enough for a bare
   10.1 inch panel, to be rechecked when the screen is chosen.
-- Fuse holders, terminal blocks and the 24 V to 5 V converter have no
-  mounting points yet.
+- DIN terminals are modelled as a 96 x 60 x 60 mm envelope; check against
+  the chosen fuse terminals.  The 24 V to 5 V converter has no mounting
+  point yet (it can go on the rail).
 - Material: PETG, ABS or ASA.
