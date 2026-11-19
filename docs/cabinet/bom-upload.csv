@@ -1,0 +1,19 @@
+Manufacturer,Part Number,Quantity,Description,Note
+Lumberg,0304 05-1,5,M16 female panel socket 5-pole 240 deg (guns),4 + 1 spare
+Lumberg,0304 05,1,M16 female panel socket 5-pole 180 deg (encoder),
+Lumberg,0304 03,1,M16 female panel socket 3-pole (eye),
+Mean Well,LRS-100-24,2,Power supply 24 V 4.5 A,
+Schaffner,FN370-2-21,1,IEC C14 inlet with switch fuse 5x20 and filter 2 A,
+Neutrik,NAUSB-W,1,USB A-B panel feed-through D type,
+Phoenix Contact,NS 35/7.5 PERF 2000MM,1,DIN rail 35 mm perforated (cut to 120 mm),
+Phoenix Contact,UT 4-HESI (5X20),4,DIN rail fuse terminal 5x20,F1-F4
+Phoenix Contact,UT 2.5,10,DIN rail feed-through terminal 2.5 mm2,0 V / +24 V / R1
+Phoenix Contact,UT 2.5-PE,1,DIN rail PE terminal,
+Phoenix Contact,FBS 4-5,2,Plug-in jumper 4-pole for UT 2.5,verify it fits the chosen terminal
+Phoenix Contact,CLIPFIX 35,2,DIN rail end stop,
+,6A10,4,Diode 6 A 1000 V axial (any maker),2 + 2 spare
+,,3,Resistor 1.5 kohm 1 W axial (any maker),1 + 2 spare
+,,3,Fuse 5x20 slow 4 A (any maker),F1
+,,3,Fuse 5x20 slow 2 A (any maker),F0 mains and F4
+,,3,Fuse 5x20 slow 1 A (any maker),F2
+,,3,Fuse 5x20 0.5 A (any maker),F3
