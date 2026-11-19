@@ -187,3 +187,7 @@ Open points: which controller pins carry the HMI UART (UART0 is shared with
 the CP2102, so a second UART on spare pins is the likely answer); the
 controller's 2 s command watchdog means the HMI must ping; Hebrew (RTL)
 fonts in LVGL; 5 V supply current of the panel.
+
+Decision 2026-11-19: operator stands; screen in a front panel leaning back
+15 degrees from vertical (a nearly flat lid collects dirt and is easily
+hit).  Box draft 2: 270 x 250 x 177 mm.

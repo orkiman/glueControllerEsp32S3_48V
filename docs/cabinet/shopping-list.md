@@ -44,7 +44,8 @@ the hole in the box is set to the one that arrives.
 
 | Item | Qty | Search words |
 | ---- | --- | ------------ |
-| M3 brass heat-set inserts, about 4-5 mm long, OD about 4.5-5 mm | 20 | "M3 heat set insert" |
+| M3 brass heat-set inserts, about 4-6 mm long (17 used) | 50 | "M3 heat set insert" - note the outer diameter and send it |
+| Self-tapping M3 screws, 8 mm, for the screen PCB | 4 | - |
 | M3 screws 6 / 8 / 10 mm, pan head | assortment | "M3 screw kit" |
 | Wire 0.75 mm2 red / black / blue, 0.25 mm2 for signals, ferrules | - | - |
 | USB cable A to the DevKit's connector (micro-B or C), 30 cm | 1 | - |
