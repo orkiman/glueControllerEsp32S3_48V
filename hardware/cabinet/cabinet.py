@@ -33,7 +33,8 @@ INSERT_D, INSERT_DEPTH = 4.0, 7.0           # M3 heat-set insert pocket
 SCREW_D = 3.4
 
 # ------------------------------------------------------------------ rear panel
-M16_HOLE_D = 16.2            # VERIFY against the socket datasheet
+M16_HOLE_D = 18.05           # Amphenol C091A front-mount: 18 +0.1, key slot 2.8 wide to 19.1, panel 1-5 mm
+M16_KEY_W, M16_KEY_DEPTH = 2.85, 19.15 - 18.05 / 2
 M16_Z, M16_X0, M16_PITCH = 42.0, 95.0, 27.0
 M16_LABELS = ["EYE", "ENC", "GUN 4", "GUN 3", "GUN 2", "GUN 1"]   # in +x order
 IEC_W, IEC_H = 27.5, 47.5    # VERIFY: snap-in inlet with switch and fuse
@@ -125,7 +126,10 @@ def make_body():
 
     # --- rear wall
     for i in range(6):
-        body = body.cut(ycyl(M16_X0 + i * M16_PITCH, M16_Z, M16_HOLE_D, D - T - 1, D + 1))
+        x = M16_X0 + i * M16_PITCH
+        body = body.cut(ycyl(x, M16_Z, M16_HOLE_D, D - T - 1, D + 1))
+        # key slot pointing down: pin 2 (180 deg / 3-pole) or pin 3 (240 deg) ends up at the top
+        body = body.cut(box(x - M16_KEY_W / 2, x + M16_KEY_W / 2, D - T - 1, D + 1, M16_Z - (M16_HOLE_D / 2 + M16_KEY_DEPTH), M16_Z))
     body = body.cut(box(IEC_X - IEC_W / 2, IEC_X + IEC_W / 2, D - T - 1, D + 1,
                         IEC_Z - IEC_H / 2, IEC_Z + IEC_H / 2))
     body = body.cut(ycyl(USB_X, USB_Z, USB_HOLE_D, D - T - 1, D + 1))

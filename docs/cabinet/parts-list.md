@@ -23,6 +23,12 @@ other's plugs, as on the old controller.
 Wiring: Gun pin 1 = Gun +, pin 2 = Gun -.  ENC pin 1 = +24 V, 2 = 0 V,
 3 = signal.  Eye pin 1 = +24 V, 2 = 0 V, 3 = signal.
 
+Chosen (Mouser cart 2026-11-19, verified on the Amphenol drawing
+NA T 3XXX 0XX U): Amphenol Tuchel C091A front-mount female, solder,
+T 3363 000 (gun, 05-a, 240 deg) x5, T 3363 010 (encoder, 05-b, 180 deg) x1,
+T 3263 000 (eye, 03-a) x1.  Panel cut-out 18 mm + key slot 2.8 mm to
+19.1 mm, panel 1-5 mm.  Solder cups take wire up to 0.5 mm2.
+
 ## Power
 
 | Item | Qty | Proposal | Notes |
