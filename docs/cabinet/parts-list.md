@@ -55,3 +55,21 @@ T 3263 000 (eye, 03-a) x1.  Panel cut-out 18 mm + key slot 2.8 mm to
 
 Flap output, purge buttons, glue level, pressure output, Reset, emergency
 stop.
+
+## Order 1 (Mouser cart reviewed 2026-11-19, about 152 USD)
+
+| Item | Part | Qty |
+| ---- | ---- | --- |
+| Gun socket | Amphenol Tuchel T 3363 000 (C091A, 05-a, 240 deg) | 5 |
+| Encoder socket | Amphenol Tuchel T 3363 010 (C091A, 05-b, 180 deg) | 1 |
+| Eye socket | Amphenol Tuchel T 3263 000 (C091A, 03-a) | 1 |
+| Supplies | Mean Well LRS-100-24 | 2 |
+| Mains inlet | Bulgin BZV01/Z0000/10: C14, 2-pole switch, 5x20 fuse holder, snap-in, cut-out 70.1 x 34.4 mm (min); panel thickness depends on the suffix - check before modelling | 1 |
+| USB feed-through | Neutrik NAUSB-W (mount with the B socket outside) | 1 |
+| 5 V for the screen | Mean Well DDR-30G-5 (DIN rail, 35 mm wide, 9-36 V in, 5 V 6 A) | 1 |
+| Diodes | Comchip 6A10-G | 4 |
+| R1 | YAGEO FMP100JR-52-1K5 (1.5 k, 1 W) | 3 |
+
+Owner already has: DIN rail, fuse and feed-through terminals, jumpers,
+fuses.  Screen: Elecrow CrowPanel Advanced 10.1 (ESP32-P4), ordered from
+Elecrow (DDP).
